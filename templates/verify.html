@@ -6,8 +6,11 @@
 <title>TEAM SECRET — Verification</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- NEW: Conditionally include ad SDK based on ADS_ENABLED -->
+{% if ads_enabled %}
 <!-- Rewarded Interstitial Ad SDK -->
 <script src='//libtl.com/sdk.js' data-zone='10391340' data-sdk='show_10391340'></script>
+{% endif %}
 
 <style>
 :root{
@@ -1352,9 +1355,12 @@ if (user) {
     fullnameElement.textContent = 'User';
 }
 
-// Check if ad SDK is available
+// NEW: Read ads_enabled from template
+const adsEnabled = {{ ads_enabled|tojson }};
+
+// Modified: isAdSDKAvailable now also respects adsEnabled
 function isAdSDKAvailable() {
-    return typeof show_10391340 === 'function';
+    return adsEnabled && typeof show_10391340 === 'function';
 }
 
 // Function to get the protected link
@@ -1810,9 +1816,9 @@ async function verifyMembership() {
 
 // Initialize auto ads when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize automatic in-app interstitial ads
-    setTimeout(() => {
-        if (isAdSDKAvailable()) {
+    // NEW: conditionally initialize automatic in-app interstitial ads
+    if (adsEnabled && isAdSDKAvailable()) {
+        setTimeout(() => {
             show_10391340({
                 type: 'inApp',
                 inAppSettings: {
@@ -1823,8 +1829,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     everyPage: false
                 }
             });
-        }
-    }, 3000);
+        }, 3000);
+    }
     
     // Event listener for verify button
     verifyBtn.addEventListener('click', verifyMembership);
