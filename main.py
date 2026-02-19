@@ -1657,12 +1657,16 @@ async def verify_page(request: Request, token: str, user_id: Optional[int] = Non
     if not link_data:
         raise HTTPException(status_code=404, detail="Link not found or expired")
     
+    # NEW: read ADS_ENABLED environment variable
+    ads_enabled = os.environ.get("ADS_ENABLED", "false").lower() == "true"
+    
     return templates.TemplateResponse(
         "verify.html", 
         {
             "request": request, 
             "token": token,
             "user_id": user_id,  # Pass user_id to template for tracking
+            "ads_enabled": ads_enabled,          # ← added
             "tutorial_link": "https://t.me/team_secret_tutorial_video/5",
             "contact_bot": "https://t.me/team_secret_cont_bot"
         }
