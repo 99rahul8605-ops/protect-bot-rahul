@@ -672,33 +672,61 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             not_joined_channels = [ch for ch in channel_info["channels"] if not ch['is_member']]
 
             if not_joined_channels:
-                # Show channels user needs to join
+                # Show channels user needs to join (blue primary)
                 for i in range(0, len(not_joined_channels), 2):
                     row_buttons = []
                     for j in range(2):
                         if i + j < len(not_joined_channels):
                             channel = not_joined_channels[i + j]
                             button_text = f"📢 {channel['display_name'][:15]}"  # Limit text length
-                            row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                            row_buttons.append(InlineKeyboardButton(
+                                button_text,
+                                url=channel["invite_link"],
+                                api_kwargs={'style': 'primary'}  # blue
+                            ))
                     if row_buttons:
                         keyboard.append(row_buttons)
                 
-                # Add check button
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data=callback_data)])
+                # Add check button (green success)
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data=callback_data,
+                    api_kwargs={'style': 'success'}  # green
+                )])
                 
-                # Add tutorial and contact buttons in a new row
+                # Add tutorial and contact buttons (blue primary)
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
             else:
                 # User has joined all channels - this shouldn't happen but as a fallback
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data=callback_data)])
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data=callback_data,
+                    api_kwargs={'style': 'success'}
+                )])
                 
                 # Add tutorial and contact buttons
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -736,7 +764,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # Updated: Include user_id in the WebApp URL for ad tracking
             web_app_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/verify?token={encoded_id}&user_id={update.effective_user.id}"
             
-            keyboard = [[InlineKeyboardButton("🔗 Join Group", web_app=WebAppInfo(url=web_app_url))]]
+            keyboard = [[InlineKeyboardButton(
+                "🔗 Join Group",
+                web_app=WebAppInfo(url=web_app_url),
+                api_kwargs={'style': 'primary'}  # blue
+            )]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await update.message.reply_text(
@@ -786,18 +818,34 @@ I help you keep your channel links safe & secure.
                 if i + j < len(channel_info["channels"]):
                     channel = channel_info["channels"][i + j]
                     button_text = f"🌟 {channel['display_name'][:15]}"  # Limit text length
-                    row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                    row_buttons.append(InlineKeyboardButton(
+                        button_text,
+                        url=channel["invite_link"],
+                        api_kwargs={'style': 'primary'}  # blue
+                    ))
             if row_buttons:
                 keyboard.append(row_buttons)
     
-    # Add tutorial and contact buttons
+    # Add tutorial and contact buttons (blue primary)
     keyboard.append([
-        InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-        InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+        InlineKeyboardButton(
+            "📺 Tutorial",
+            url="https://t.me/team_secret_tutorial_video/5",
+            api_kwargs={'style': 'primary'}
+        ),
+        InlineKeyboardButton(
+            "📞 Contact",
+            url="https://t.me/team_secret_cont_bot",
+            api_kwargs={'style': 'primary'}
+        )
     ])
     
-    # Add create link button
-    keyboard.append([InlineKeyboardButton("🚀 Create Protected Link", callback_data="create_link")])
+    # Add create link button (green success)
+    keyboard.append([InlineKeyboardButton(
+        "🚀 Create Protected Link",
+        callback_data="create_link",
+        api_kwargs={'style': 'success'}  # green
+    )])
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
     
@@ -829,24 +877,40 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             not_joined_channels = [ch for ch in channel_info["channels"] if not ch['is_member']]
             
             if not_joined_channels:
-                # Show channels user needs to join
+                # Show channels user needs to join (blue primary)
                 for i in range(0, len(not_joined_channels), 2):
                     row_buttons = []
                     for j in range(2):
                         if i + j < len(not_joined_channels):
                             channel = not_joined_channels[i + j]
                             button_text = f"📢 {channel['display_name'][:15]}"  # Limit text length
-                            row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                            row_buttons.append(InlineKeyboardButton(
+                                button_text,
+                                url=channel["invite_link"],
+                                api_kwargs={'style': 'primary'}
+                            ))
                     if row_buttons:
                         keyboard.append(row_buttons)
                 
-                # Add check button
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data="check_join")])
+                # Add check button (green success)
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data="check_join",
+                    api_kwargs={'style': 'success'}
+                )])
                 
-                # Add tutorial and contact buttons
+                # Add tutorial and contact buttons (blue primary)
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
                 
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -877,7 +941,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 # Updated: Include user_id in the WebApp URL for ad tracking
                 web_app_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/verify?token={encoded_id}&user_id={query.from_user.id}"
                 
-                keyboard = [[InlineKeyboardButton("🔗 Join Group", web_app=WebAppInfo(url=web_app_url))]]
+                keyboard = [[InlineKeyboardButton(
+                    "🔗 Join Group",
+                    web_app=WebAppInfo(url=web_app_url),
+                    api_kwargs={'style': 'primary'}
+                )]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.message.edit_text(
@@ -896,24 +964,40 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             not_joined_channels = [ch for ch in channel_info["channels"] if not ch['is_member']]
             
             if not_joined_channels:
-                # Show channels user needs to join
+                # Show channels user needs to join (blue primary)
                 for i in range(0, len(not_joined_channels), 2):
                     row_buttons = []
                     for j in range(2):
                         if i + j < len(not_joined_channels):
                             channel = not_joined_channels[i + j]
                             button_text = f"📢 {channel['display_name'][:15]}"  # Limit text length
-                            row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                            row_buttons.append(InlineKeyboardButton(
+                                button_text,
+                                url=channel["invite_link"],
+                                api_kwargs={'style': 'primary'}
+                            ))
                     if row_buttons:
                         keyboard.append(row_buttons)
                 
-                # Add check button with the same encoded_id
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data=f"check_join_{encoded_id}")])
+                # Add check button with the same encoded_id (green success)
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data=f"check_join_{encoded_id}",
+                    api_kwargs={'style': 'success'}
+                )])
                 
-                # Add tutorial and contact buttons
+                # Add tutorial and contact buttons (blue primary)
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
                 
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -979,32 +1063,60 @@ async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             not_joined_channels = [ch for ch in channel_info["channels"] if not ch['is_member']]
 
             if not_joined_channels:
-                # Show channels user needs to join
+                # Show channels user needs to join (blue primary)
                 for i in range(0, len(not_joined_channels), 2):
                     row_buttons = []
                     for j in range(2):
                         if i + j < len(not_joined_channels):
                             channel = not_joined_channels[i + j]
                             button_text = f"📢 {channel['display_name'][:15]}"  # Limit text length
-                            row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                            row_buttons.append(InlineKeyboardButton(
+                                button_text,
+                                url=channel["invite_link"],
+                                api_kwargs={'style': 'primary'}
+                            ))
                     if row_buttons:
                         keyboard.append(row_buttons)
                 
-                # Add check button
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data="check_join")])
+                # Add check button (green success)
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data="check_join",
+                    api_kwargs={'style': 'success'}
+                )])
                 
-                # Add tutorial and contact buttons
+                # Add tutorial and contact buttons (blue primary)
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
             else:
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data="check_join")])
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data="check_join",
+                    api_kwargs={'style': 'success'}
+                )])
                 
                 # Add tutorial and contact buttons
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
                 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1061,12 +1173,28 @@ async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Simple buttons with tutorial and contact
     keyboard = [
         [
-            InlineKeyboardButton("📤 Share", url=f"https://t.me/share/url?url={protected_link}&text=🔐 Protected Link - Join via secure invitation"),
-            InlineKeyboardButton("❌ Revoke", callback_data=f"revoke_{encoded_id}")
+            InlineKeyboardButton(
+                "📤 Share",
+                url=f"https://t.me/share/url?url={protected_link}&text=🔐 Protected Link - Join via secure invitation",
+                api_kwargs={'style': 'primary'}  # blue
+            ),
+            InlineKeyboardButton(
+                "❌ Revoke",
+                callback_data=f"revoke_{encoded_id}",
+                api_kwargs={'style': 'danger'}  # red
+            )
         ],
         [
-            InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-            InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+            InlineKeyboardButton(
+                "📺 Tutorial",
+                url="https://t.me/team_secret_tutorial_video/5",
+                api_kwargs={'style': 'primary'}
+            ),
+            InlineKeyboardButton(
+                "📞 Contact",
+                url="https://t.me/team_secret_cont_bot",
+                api_kwargs={'style': 'primary'}
+            )
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1110,32 +1238,60 @@ async def revoke_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             not_joined_channels = [ch for ch in channel_info["channels"] if not ch['is_member']]
 
             if not_joined_channels:
-                # Show channels user needs to join
+                # Show channels user needs to join (blue primary)
                 for i in range(0, len(not_joined_channels), 2):
                     row_buttons = []
                     for j in range(2):
                         if i + j < len(not_joined_channels):
                             channel = not_joined_channels[i + j]
                             button_text = f"📢 {channel['display_name'][:15]}"  # Limit text length
-                            row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                            row_buttons.append(InlineKeyboardButton(
+                                button_text,
+                                url=channel["invite_link"],
+                                api_kwargs={'style': 'primary'}
+                            ))
                     if row_buttons:
                         keyboard.append(row_buttons)
                 
-                # Add check button
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data="check_join")])
+                # Add check button (green success)
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data="check_join",
+                    api_kwargs={'style': 'success'}
+                )])
                 
-                # Add tutorial and contact buttons
+                # Add tutorial and contact buttons (blue primary)
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
             else:
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data="check_join")])
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data="check_join",
+                    api_kwargs={'style': 'success'}
+                )])
                 
                 # Add tutorial and contact buttons
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
                 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1172,13 +1328,22 @@ async def revoke_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             message += f"• `{short_id}` - {clicks} clicks - {created}\n"
             keyboard.append([InlineKeyboardButton(
                 f"❌ Revoke {short_id}",
-                callback_data=f"revoke_{link['_id']}"
+                callback_data=f"revoke_{link['_id']}",
+                api_kwargs={'style': 'danger'}  # red
             )])
         
-        # Add tutorial and contact buttons
+        # Add tutorial and contact buttons (blue primary)
         keyboard.append([
-            InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-            InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+            InlineKeyboardButton(
+                "📺 Tutorial",
+                url="https://t.me/team_secret_tutorial_video/5",
+                api_kwargs={'style': 'primary'}
+            ),
+            InlineKeyboardButton(
+                "📞 Contact",
+                url="https://t.me/team_secret_cont_bot",
+                api_kwargs={'style': 'primary'}
+            )
         ])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1309,8 +1474,20 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     total_users = users_collection.count_documents({})
     keyboard = [
-        [InlineKeyboardButton("✅ Confirm Broadcast", callback_data="confirm_broadcast")],
-        [InlineKeyboardButton("❌ Cancel", callback_data="cancel_broadcast")]
+        [
+            InlineKeyboardButton(
+                "✅ Confirm Broadcast",
+                callback_data="confirm_broadcast",
+                api_kwargs={'style': 'success'}  # green
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "❌ Cancel",
+                callback_data="cancel_broadcast",
+                api_kwargs={'style': 'danger'}  # red
+            )
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -1455,32 +1632,60 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             not_joined_channels = [ch for ch in channel_info["channels"] if not ch['is_member']]
 
             if not_joined_channels:
-                # Show channels user needs to join
+                # Show channels user needs to join (blue primary)
                 for i in range(0, len(not_joined_channels), 2):
                     row_buttons = []
                     for j in range(2):
                         if i + j < len(not_joined_channels):
                             channel = not_joined_channels[i + j]
                             button_text = f"📢 {channel['display_name'][:15]}"  # Limit text length
-                            row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                            row_buttons.append(InlineKeyboardButton(
+                                button_text,
+                                url=channel["invite_link"],
+                                api_kwargs={'style': 'primary'}
+                            ))
                     if row_buttons:
                         keyboard.append(row_buttons)
                 
-                # Add check button
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data="check_join")])
+                # Add check button (green success)
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data="check_join",
+                    api_kwargs={'style': 'success'}
+                )])
                 
-                # Add tutorial and contact buttons
+                # Add tutorial and contact buttons (blue primary)
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
             else:
-                keyboard.append([InlineKeyboardButton("✅ Check Membership", callback_data="check_join")])
+                keyboard.append([InlineKeyboardButton(
+                    "✅ Check Membership",
+                    callback_data="check_join",
+                    api_kwargs={'style': 'success'}
+                )])
                 
                 # Add tutorial and contact buttons
                 keyboard.append([
-                    InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-                    InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+                    InlineKeyboardButton(
+                        "📺 Tutorial",
+                        url="https://t.me/team_secret_tutorial_video/5",
+                        api_kwargs={'style': 'primary'}
+                    ),
+                    InlineKeyboardButton(
+                        "📞 Contact",
+                        url="https://t.me/team_secret_cont_bot",
+                        api_kwargs={'style': 'primary'}
+                    )
                 ])
                 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1510,14 +1715,26 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 if i + j < len(channel_info["channels"]):
                     channel = channel_info["channels"][i + j]
                     button_text = f"🌟 {channel['display_name'][:15]}"  # Limit text length
-                    row_buttons.append(InlineKeyboardButton(button_text, url=channel["invite_link"]))
+                    row_buttons.append(InlineKeyboardButton(
+                        button_text,
+                        url=channel["invite_link"],
+                        api_kwargs={'style': 'primary'}
+                    ))
             if row_buttons:
                 keyboard.append(row_buttons)
     
-    # Add tutorial and contact buttons
+    # Add tutorial and contact buttons (blue primary)
     keyboard.append([
-        InlineKeyboardButton("📺 Tutorial", url="https://t.me/team_secret_tutorial_video/5"),
-        InlineKeyboardButton("📞 Contact", url="https://t.me/team_secret_cont_bot")
+        InlineKeyboardButton(
+            "📺 Tutorial",
+            url="https://t.me/team_secret_tutorial_video/5",
+            api_kwargs={'style': 'primary'}
+        ),
+        InlineKeyboardButton(
+            "📞 Contact",
+            url="https://t.me/team_secret_cont_bot",
+            api_kwargs={'style': 'primary'}
+        )
     ])
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
