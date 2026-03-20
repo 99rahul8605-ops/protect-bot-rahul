@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from pymongo import MongoClient
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 
 # --- Telegram Imports ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ChatMember, ChatInviteLink
@@ -1504,16 +1504,78 @@ async def telegram_webhook(request: Request, token: str):
     
     return Response(status_code=200)
 
-@app.get("/health")
+@app.get("/health", response_class=HTMLResponse)
 async def health_check():
     """Lightweight health check for uptime monitoring."""
     try:
         # Quick MongoDB ping
         client.admin.command('ismaster')
-        return {"status": "ok", "service": "LinkShield Pro", "database": "connected"}
+        status = "UP"
+        color = "green"
+        db_status = "Connected"
+        http_code = 200
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Database not available")
+        status = "DOWN"
+        color = "red"
+        db_status = "Disconnected"
+        http_code = 503
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>LinkShield Pro - Health Status</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                text-align: center;
+                margin-top: 50px;
+                background-color: #f0f0f0;
+            }}
+            .container {{
+                background-color: white;
+                border-radius: 10px;
+                padding: 30px;
+                display: inline-block;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }}
+            .status {{
+                font-size: 24px;
+                font-weight: bold;
+                color: {color};
+                margin: 20px 0;
+            }}
+            .details {{
+                text-align: left;
+                margin-top: 20px;
+                font-family: monospace;
+            }}
+            .footer {{
+                margin-top: 30px;
+                font-size: 12px;
+                color: #666;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>LinkShield Pro</h1>
+            <div class="status">System Status: {status}</div>
+            <div class="details">
+                <strong>Database:</strong> {db_status}<br>
+                <strong>Time:</strong> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br>
+                <strong>Version:</strong> 2.1.0
+            </div>
+            <div class="footer">
+                <a href="/">Go to Home</a> | 
+                <a href="https://t.me/team_secret_cont_bot">Contact</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=http_code)
 
 @app.get("/")
 async def root():
