@@ -8,8 +8,8 @@ import io
 import requests
 from typing import Optional, List, Dict, Any
 from pymongo import MongoClient
-from flask import Flask, request, Response, render_template, jsonify, redirect, abort
-from flask.templating import render_template_string  # if needed
+from flask import Flask, request, Response, render_template, jsonify, abort
+from flask.templating import render_template_string
 
 # --- Telegram Imports ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ChatMember, ChatInviteLink
@@ -1420,37 +1420,41 @@ telegram_bot_app.add_handler(CallbackQueryHandler(button_callback))
 
 # --- Flask Setup ---
 app = Flask(__name__)
-
-# Set up templates folder (if needed)
 app.template_folder = 'templates'
 
-@app.before_first_request
-def startup():
-    """Initialize bot and set webhook before first request."""
-    global telegram_bot_app
+# Global flag to ensure bot is initialized once
+bot_initialized = False
+
+def initialize_bot():
+    """Initialize Telegram bot and set webhook."""
+    global bot_initialized
+    if bot_initialized:
+        return
     try:
-        # Initialize bot application if not already done
-        if not telegram_bot_app.running:
-            # We need to run the bot in a background task because Flask is blocking
-            # For simplicity, we'll initialize it and set webhook here
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(telegram_bot_app.initialize())
-            loop.run_until_complete(telegram_bot_app.start())
-            
-            # Set webhook
-            webhook_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/{os.environ.get('TELEGRAM_TOKEN')}"
-            loop.run_until_complete(telegram_bot_app.bot.set_webhook(url=webhook_url))
-            logger.info(f"Webhook set: {webhook_url}")
-            
-            # Pre-fetch channel info
-            loop.run_until_complete(get_channel_promo_info(telegram_bot_app, force_refresh=False))
-            loop.run_until_complete(refresh_all_channel_photos(telegram_bot_app.bot))
-            
-            logger.info("Bot started and webhook configured")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Initialize and start the bot application
+        loop.run_until_complete(telegram_bot_app.initialize())
+        loop.run_until_complete(telegram_bot_app.start())
+        
+        # Set webhook
+        webhook_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/{os.environ.get('TELEGRAM_TOKEN')}"
+        loop.run_until_complete(telegram_bot_app.bot.set_webhook(url=webhook_url))
+        logger.info(f"Webhook set: {webhook_url}")
+        
+        # Pre-fetch channel info
+        loop.run_until_complete(get_channel_promo_info(telegram_bot_app, force_refresh=False))
+        loop.run_until_complete(refresh_all_channel_photos(telegram_bot_app.bot))
+        
+        logger.info("Bot started and webhook configured")
+        bot_initialized = True
     except Exception as e:
-        logger.error(f"Startup error: {e}")
+        logger.error(f"Bot initialization error: {e}")
+        raise
+
+# Initialize bot when the module loads
+initialize_bot()
 
 @app.route('/health')
 def health():
@@ -1554,10 +1558,10 @@ def check_membership_api(token):
         logger.error(f"Failed to track page view: {e}")
     
     # Get channel info
-    import asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     channel_info = loop.run_until_complete(get_channel_info_for_user(user_id))
+    loop.close()
     
     return jsonify({
         "is_member": channel_info["is_member"],
@@ -1586,11 +1590,11 @@ def get_channel_photo(channel_id):
         bot = Bot(token=bot_token)
         
         # Download the photo (async needs to be run in event loop)
-        import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         photo_file = loop.run_until_complete(bot.get_file(channel_data["photo_id"]))
         photo_bytes = loop.run_until_complete(photo_file.download_as_bytearray())
+        loop.close()
         
         return Response(photo_bytes, status=200, content_type='image/jpeg',
                         headers={'Cache-Control': 'public, max-age=86400'})
@@ -1615,10 +1619,10 @@ def join_page():
         abort(404, "Link not found")
     
     # Check membership
-    import asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     is_member = loop.run_until_complete(verify_user_membership(user_id))
+    loop.close()
     
     if not is_member:
         # Track failed join
@@ -1692,13 +1696,14 @@ def telegram_webhook(token):
     update = Update.de_json(update_data, telegram_bot_app.bot)
     
     # Process update asynchronously
-    import asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(telegram_bot_app.process_update(update))
+    loop.close()
     
     return Response(status=200)
 
-# Run the app
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    # Run the Flask app
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
