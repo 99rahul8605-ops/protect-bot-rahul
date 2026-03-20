@@ -404,42 +404,84 @@ async def is_bot_admin(bot, chat_id: str) -> bool:
         logger.error(f"Error checking bot admin status in {chat_id}: {e}")
         return False
 
-async def get_channel_photo_url(bot, channel_id: str) -> Optional[str]:
-    """Get channel photo and return a proxied URL."""
+async def get_channel_photo_url(bot, channel_id: str, force_refresh: bool = False) -> Optional[str]:
+    """Get channel photo and return a proxied URL. Updates if photo changed."""
     try:
         # Check database first
         channel_data = channels_collection.find_one({"channel_id": channel_id})
-        if channel_data and channel_data.get("photo_id"):
-            # Return our proxy URL
-            return f"{os.environ.get('RENDER_EXTERNAL_URL')}/channel_photo/{channel_id}"
+        stored_photo_id = channel_data.get("photo_id") if channel_data else None
+        stored_unique_id = channel_data.get("photo_unique_id") if channel_data else None
+        last_updated = channel_data.get("last_updated") if channel_data else None
         
-        # Convert channel_id to appropriate format
-        try:
-            chat_id = int(channel_id)
-        except ValueError:
-            if channel_id.startswith('@'):
-                chat_id = channel_id
+        # Determine if we need to refresh
+        refresh_needed = force_refresh
+        if not refresh_needed:
+            if not stored_photo_id:
+                refresh_needed = True
+            elif last_updated:
+                age = datetime.datetime.now() - last_updated
+                if age > datetime.timedelta(hours=1):  # refresh every hour
+                    refresh_needed = True
             else:
-                chat_id = f"@{channel_id}"
+                refresh_needed = True
         
-        # Get chat information
-        chat = await bot.get_chat(chat_id)
-        
-        if chat.photo:
-            # Store photo file_id in database
-            channels_collection.update_one(
-                {"channel_id": channel_id},
-                {"$set": {
-                    "photo_id": chat.photo.big_file_id,
-                    "last_updated": datetime.datetime.now()
-                }},
-                upsert=True
-            )
+        if refresh_needed:
+            # Convert channel_id to appropriate format
+            try:
+                chat_id = int(channel_id)
+            except ValueError:
+                if channel_id.startswith('@'):
+                    chat_id = channel_id
+                else:
+                    chat_id = f"@{channel_id}"
             
-            # Return our proxy URL
-            return f"{os.environ.get('RENDER_EXTERNAL_URL')}/channel_photo/{channel_id}"
+            # Get chat information
+            try:
+                chat = await bot.get_chat(chat_id)
+                if chat.photo:
+                    current_unique_id = chat.photo.big_file_unique_id
+                    # If unique ID changed or no stored photo, update
+                    if not stored_unique_id or current_unique_id != stored_unique_id:
+                        # Store new photo file_id
+                        channels_collection.update_one(
+                            {"channel_id": channel_id},
+                            {"$set": {
+                                "photo_id": chat.photo.big_file_id,
+                                "photo_unique_id": current_unique_id,
+                                "last_updated": datetime.datetime.now()
+                            }},
+                            upsert=True
+                        )
+                        logger.info(f"Updated photo for channel {channel_id}")
+                        stored_photo_id = chat.photo.big_file_id
+                    else:
+                        # Photo unchanged, just update timestamp
+                        channels_collection.update_one(
+                            {"channel_id": channel_id},
+                            {"$set": {"last_updated": datetime.datetime.now()}},
+                            upsert=True
+                        )
+                else:
+                    # No photo, ensure database reflects that
+                    channels_collection.update_one(
+                        {"channel_id": channel_id},
+                        {"$set": {"photo_id": None, "photo_unique_id": None, "last_updated": datetime.datetime.now()}},
+                        upsert=True
+                    )
+                    stored_photo_id = None
+            except Exception as e:
+                logger.error(f"Failed to fetch chat photo for {channel_id}: {e}")
+                # If we already have a stored photo, fall back to it
+                if not stored_photo_id:
+                    return None
+                # else continue using stored_photo_id
         
-        return None
+        # If we have a stored photo_id, return proxy URL
+        if stored_photo_id:
+            return f"{os.environ.get('RENDER_EXTERNAL_URL')}/channel_photo/{channel_id}"
+        else:
+            return None
+            
     except Exception as e:
         logger.error(f"Failed to get channel photo for {channel_id}: {e}")
         return None
@@ -487,8 +529,8 @@ async def get_channel_info_for_user(user_id: int) -> Dict[str, Any]:
                     chat_title = chat.title or format_channel_name(channel)
                     chat_username = getattr(chat, 'username', None)
                     
-                    # Get channel photo URL (using our proxy)
-                    logo_url = await get_channel_photo_url(bot, channel)
+                    # Get channel photo URL (using our proxy) - do not force refresh here to avoid too many calls
+                    logo_url = await get_channel_photo_url(bot, channel, force_refresh=False)
                     
                     # Get or create invite link
                     invite_link = None
@@ -565,7 +607,7 @@ async def get_channel_info_for_user(user_id: int) -> Dict[str, Any]:
                 if not is_channel_member:
                     is_member = False
                 
-                # Try to get existing photo URL from database
+                # Try to get existing photo URL from database if not already set
                 if not logo_url:
                     channel_data = channels_collection.find_one({"channel_id": channel})
                     if channel_data and channel_data.get("photo_id"):
@@ -629,7 +671,7 @@ async def get_channel_info_for_user(user_id: int) -> Dict[str, Any]:
             "invite_link": fallback_channels[0]["invite_link"] if fallback_channels else None
         }
 
-async def get_channel_promo_info(context: ContextTypes.DEFAULT_TYPE) -> List[Dict[str, Any]]:
+async def get_channel_promo_info(context: ContextTypes.DEFAULT_TYPE, force_refresh: bool = False) -> List[Dict[str, Any]]:
     """Get channel promotional info (title, invite link) quickly using cached data."""
     support_channels = get_support_channels()
     if not support_channels:
@@ -641,9 +683,10 @@ async def get_channel_promo_info(context: ContextTypes.DEFAULT_TYPE) -> List[Dic
         channel_data = channels_collection.find_one({"channel_id": channel})
         title = channel_data.get("title") if channel_data else None
         invite_link = channel_data.get("invite_link") if channel_data else None
+        photo_id = channel_data.get("photo_id") if channel_data else None
         
-        # If missing, fetch now (this may be slow but happens only once per channel)
-        if not title or not invite_link:
+        # If missing or forced refresh, fetch now
+        if force_refresh or not title or not invite_link:
             try:
                 # Convert channel_id to appropriate format
                 try:
@@ -699,13 +742,31 @@ async def get_channel_promo_info(context: ContextTypes.DEFAULT_TYPE) -> List[Dic
                 else:
                     invite_link = f"https://t.me/{channel}"
         
+        # Get photo URL (might be cached, but we may also force refresh photos separately)
+        # We'll handle photos in a separate call to avoid blocking here.
+        
         promo_info.append({
             "channel": channel,
             "title": title,
             "invite_link": invite_link,
+            "photo_id": photo_id
         })
     
     return promo_info
+
+async def refresh_all_channel_photos(bot):
+    """Force refresh all channel photos on startup."""
+    support_channels = get_support_channels()
+    if not support_channels:
+        return
+    
+    logger.info("Force refreshing all channel photos...")
+    for channel in support_channels:
+        try:
+            await get_channel_photo_url(bot, channel, force_refresh=True)
+        except Exception as e:
+            logger.error(f"Error refreshing photo for {channel}: {e}")
+    logger.info("Channel photo refresh completed.")
 
 # --- Telegram Bot Logic ---
 telegram_bot_app = Application.builder().token(os.environ.get("TELEGRAM_TOKEN")).build()
@@ -776,7 +837,7 @@ I help you keep your channel links safe & secure.
     
     # Create keyboard with support channel buttons (using cached data)
     keyboard = []
-    promo_channels = await get_channel_promo_info(context)
+    promo_channels = await get_channel_promo_info(context, force_refresh=False)
     if promo_channels:
         # Show channels in rows of 2
         for i in range(0, len(promo_channels), 2):
@@ -1271,7 +1332,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     support_channels = get_support_channels()
     if support_channels:
         # Get channel info and create individual buttons (using cached data)
-        promo_channels = await get_channel_promo_info(context)
+        promo_channels = await get_channel_promo_info(context, force_refresh=False)
         # Show all channels for promotion (not just unjoined ones)
         for i in range(0, len(promo_channels), 2):
             row_buttons = []
@@ -1388,12 +1449,18 @@ async def on_startup():
     bot_info = await telegram_bot_app.bot.get_me()
     logger.info(f"Bot: @{bot_info.username}")
     
-    # Pre-fetch channel info for faster /start responses
+    # Pre-fetch channel info for faster /start responses (without force refresh)
     try:
-        promo_info = await get_channel_promo_info(telegram_bot_app)
+        promo_info = await get_channel_promo_info(telegram_bot_app, force_refresh=False)
         logger.info(f"Pre-fetched {len(promo_info)} support channels info")
     except Exception as e:
         logger.error(f"Error pre-fetching channel info: {e}")
+    
+    # Force refresh channel photos on every deploy to catch logo changes
+    try:
+        await refresh_all_channel_photos(telegram_bot_app.bot)
+    except Exception as e:
+        logger.error(f"Error refreshing channel photos: {e}")
     
     # Test channel link generation and get channel titles
     support_channels = get_support_channels()
