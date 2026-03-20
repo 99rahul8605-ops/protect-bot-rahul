@@ -8,8 +8,9 @@ import io
 import requests
 from typing import Optional, List, Dict, Any
 from pymongo import MongoClient
-from flask import Flask, request, Response, render_template, jsonify, abort
-from flask.templating import render_template_string
+from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import StreamingResponse, HTMLResponse
 
 # --- Telegram Imports ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ChatMember, ChatInviteLink
@@ -1418,135 +1419,163 @@ telegram_bot_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, stor
 from telegram.ext import CallbackQueryHandler
 telegram_bot_app.add_handler(CallbackQueryHandler(button_callback))
 
-# --- Flask Setup ---
-app = Flask(__name__)
-app.template_folder = 'templates'
+# --- FastAPI Setup ---
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
-# Global flag to ensure bot is initialized once
-bot_initialized = False
-
-def initialize_bot():
-    """Initialize Telegram bot and set webhook."""
-    global bot_initialized
-    if bot_initialized:
-        return
+@app.on_event("startup")
+async def on_startup():
+    """Start bot."""
+    logger.info("Starting bot...")
+    
+    required_vars = ["TELEGRAM_TOKEN", "RENDER_EXTERNAL_URL"]
+    for var in required_vars:
+        if not os.environ.get(var):
+            logger.critical(f"Missing {var}")
+            raise Exception(f"Missing {var}")
+    
+    init_db()
+    
+    # Set bot commands on startup
+    reset_and_set_commands()
+    
+    await telegram_bot_app.initialize()
+    await telegram_bot_app.start()
+    
+    webhook_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/{os.environ.get('TELEGRAM_TOKEN')}"
+    await telegram_bot_app.bot.set_webhook(url=webhook_url)
+    logger.info(f"Webhook: {webhook_url}")
+    
+    bot_info = await telegram_bot_app.bot.get_me()
+    logger.info(f"Bot: @{bot_info.username}")
+    
+    # Pre-fetch channel info for faster /start responses (without force refresh)
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        # Initialize and start the bot application
-        loop.run_until_complete(telegram_bot_app.initialize())
-        loop.run_until_complete(telegram_bot_app.start())
-        
-        # Set webhook
-        webhook_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/{os.environ.get('TELEGRAM_TOKEN')}"
-        loop.run_until_complete(telegram_bot_app.bot.set_webhook(url=webhook_url))
-        logger.info(f"Webhook set: {webhook_url}")
-        
-        # Pre-fetch channel info
-        loop.run_until_complete(get_channel_promo_info(telegram_bot_app, force_refresh=False))
-        loop.run_until_complete(refresh_all_channel_photos(telegram_bot_app.bot))
-        
-        logger.info("Bot started and webhook configured")
-        bot_initialized = True
+        promo_info = await get_channel_promo_info(telegram_bot_app, force_refresh=False)
+        logger.info(f"Pre-fetched {len(promo_info)} support channels info")
     except Exception as e:
-        logger.error(f"Bot initialization error: {e}")
-        raise
-
-# Initialize bot when the module loads
-initialize_bot()
-
-@app.route('/health')
-def health():
-    """Health check endpoint for uptime monitoring."""
+        logger.error(f"Error pre-fetching channel info: {e}")
+    
+    # Force refresh channel photos on every deploy to catch logo changes
     try:
+        await refresh_all_channel_photos(telegram_bot_app.bot)
+    except Exception as e:
+        logger.error(f"Error refreshing channel photos: {e}")
+    
+    # Test channel link generation and get channel titles
+    support_channels = get_support_channels()
+    if support_channels:
+        logger.info(f"Support channels: {support_channels}")
+        for channel in support_channels:
+            try:
+                invite_link = await get_channel_invite_link(telegram_bot_app, channel)
+                # Try to get channel title
+                try:
+                    if channel.startswith('@'):
+                        chat_id = channel
+                    else:
+                        chat_id = int(channel)
+                    
+                    chat = await telegram_bot_app.bot.get_chat(chat_id)
+                    logger.info(f"Support channel: {chat.title or channel} - Invite: {invite_link}")
+                except:
+                    logger.info(f"Support channel: {channel} - Invite: {invite_link}")
+            except Exception as e:
+                logger.error(f"Failed to generate channel link for {channel}: {e}")
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Stop bot."""
+    logger.info("Stopping bot...")
+    await telegram_bot_app.stop()
+    await telegram_bot_app.shutdown()
+    client.close()
+    logger.info("Bot stopped")
+
+@app.post("/{token}")
+async def telegram_webhook(request: Request, token: str):
+    """Telegram webhook."""
+    if token != os.environ.get("TELEGRAM_TOKEN"):
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    update_data = await request.json()
+    update = Update.de_json(update_data, telegram_bot_app.bot)
+    await telegram_bot_app.process_update(update)
+    
+    return Response(status_code=200)
+
+@app.get("/health")
+async def health_check():
+    """Lightweight health check for uptime monitoring (plain text)."""
+    try:
+        # Quick MongoDB ping
         client.admin.command('ismaster')
-        return Response("OK", status=200, content_type="text/plain")
+        return Response(content="OK", status_code=200, media_type="text/plain")
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return Response("Database error", status=503, content_type="text/plain")
+        return Response(content="Database error", status_code=503, media_type="text/plain")
 
-@app.route('/')
-def root():
-    """Root endpoint with basic stats."""
-    try:
-        total_users = users_collection.estimated_document_count()
-        active_links = links_collection.count_documents({"active": True})
-        total_ads = ad_impressions_collection.estimated_document_count()
-        return {
-            "status": "ok",
-            "service": "LinkShield Pro",
-            "version": "2.1.0",
-            "time": datetime.datetime.now().isoformat(),
-            "database": "connected",
-            "contact": "https://t.me/team_secret_cont_bot",
-            "tutorial": "https://t.me/team_secret_tutorial_video/5",
-            "stats": {
-                "total_users": total_users,
-                "active_links": active_links,
-                "total_ad_impressions": total_ads
-            }
-        }
-    except Exception as e:
-        logger.error(f"Root endpoint error: {e}")
-        return {"status": "error", "message": str(e)}, 500
+@app.get("/")
+async def root(request: Request):
+    """Root endpoint showing the welcome page."""
+    return templates.TemplateResponse("welcome.html", {"request": request})
 
-@app.route('/verify')
-def verify_page():
+@app.get("/verify")
+async def verify_page(request: Request, token: str, user_id: Optional[int] = None):
     """Verification page with ad support."""
-    token = request.args.get('token')
-    user_id = request.args.get('user_id', type=int)
-    
-    if not token:
-        abort(400, "Missing token")
-    
+    # Validate token
     link_data = links_collection.find_one({"_id": token, "active": True})
     if not link_data:
-        abort(404, "Link not found or expired")
+        raise HTTPException(status_code=404, detail="Link not found or expired")
     
+    # NEW: read ADS_ENABLED environment variable
     ads_enabled = os.environ.get("ADS_ENABLED", "false").lower() == "true"
     
-    return render_template('verify.html',
-                           token=token,
-                           user_id=user_id,
-                           ads_enabled=ads_enabled,
-                           tutorial_link="https://t.me/team_secret_tutorial_video/5",
-                           contact_bot="https://t.me/team_secret_cont_bot")
+    return templates.TemplateResponse(
+        "verify.html", 
+        {
+            "request": request, 
+            "token": token,
+            "user_id": user_id,  # Pass user_id to template for tracking
+            "ads_enabled": ads_enabled,          # ← added
+            "tutorial_link": "https://t.me/team_secret_tutorial_video/5",
+            "contact_bot": "https://t.me/team_secret_cont_bot"
+        }
+    )
 
-@app.route('/track_ad/<int:user_id>', methods=['POST'])
-def track_ad_impression(user_id):
+@app.post("/track_ad/{user_id}")
+async def track_ad_impression(user_id: int, ad_type: str = "inApp"):
     """Track ad impressions for analytics."""
     try:
-        ad_type = request.json.get('ad_type', 'inApp')
         ad_impressions_collection.insert_one({
             "user_id": user_id,
             "ad_type": ad_type,
             "timestamp": datetime.datetime.now(),
-            "revenue_estimate": 0.01
+            "revenue_estimate": 0.01  # Estimated revenue per impression
         })
+        
+        # Update user's last ad impression time
         users_collection.update_one(
             {"user_id": user_id},
             {"$set": {"last_ad_impression": datetime.datetime.now()}},
             upsert=True
         )
+        
         logger.info(f"Ad impression tracked for user {user_id}, type: {ad_type}")
-        return jsonify({"status": "success", "message": "Ad impression tracked"})
+        return {"status": "success", "message": "Ad impression tracked"}
     except Exception as e:
         logger.error(f"Failed to track ad impression: {e}")
-        return jsonify({"status": "error", "message": "Internal server error"}), 500
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.route('/check_membership/<token>')
-def check_membership_api(token):
+@app.get("/check_membership/{token}")
+async def check_membership_api(token: str, user_id: int):
     """API to check if user is member of support channels."""
-    user_id = request.args.get('user_id', type=int)
-    if not user_id:
-        abort(400, "Missing user_id")
-    
+    # First check if token is valid
     link_data = links_collection.find_one({"_id": token, "active": True})
     if not link_data:
-        abort(404, "Link not found")
+        raise HTTPException(status_code=404, detail="Link not found")
     
-    # Track page view
+    # Track that user is checking membership (potential ad view)
     try:
         ad_impressions_collection.insert_one({
             "user_id": user_id,
@@ -1557,75 +1586,83 @@ def check_membership_api(token):
     except Exception as e:
         logger.error(f"Failed to track page view: {e}")
     
-    # Get channel info
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    channel_info = loop.run_until_complete(get_channel_info_for_user(user_id))
-    loop.close()
+    # Get channel membership info WITH CHANNEL TITLES AND LOGOS
+    channel_info = await get_channel_info_for_user(user_id)
     
-    return jsonify({
+    return {
         "is_member": channel_info["is_member"],
-        "channels": channel_info["channels"],
+        "channels": channel_info["channels"],  # Now includes channel_title and logo_url
         "channel_count": channel_info["channel_count"],
         "invite_link": channel_info["invite_link"],
         "tutorial_link": "https://t.me/team_secret_tutorial_video/5",
         "contact_bot": "https://t.me/team_secret_cont_bot"
-    })
+    }
 
-@app.route('/channel_photo/<channel_id>')
-def get_channel_photo(channel_id):
+@app.get("/channel_photo/{channel_id}")
+async def get_channel_photo(channel_id: str):
     """Proxy endpoint to serve channel photos."""
     try:
+        # Get channel data from database
         channel_data = channels_collection.find_one({"channel_id": channel_id})
         if not channel_data or not channel_data.get("photo_id"):
             # Return default Telegram logo
             default_url = "https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg"
+            import requests
             response = requests.get(default_url)
-            return Response(response.content, status=200, content_type='image/svg+xml',
-                            headers={'Cache-Control': 'public, max-age=3600'})
+            return StreamingResponse(
+                io.BytesIO(response.content),
+                media_type="image/svg+xml",
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                    "Content-Disposition": f"inline; filename=default_channel.svg"
+                }
+            )
         
         # Get bot instance
         from telegram import Bot
         bot_token = os.environ.get("TELEGRAM_TOKEN")
         bot = Bot(token=bot_token)
         
-        # Download the photo (async needs to be run in event loop)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        photo_file = loop.run_until_complete(bot.get_file(channel_data["photo_id"]))
-        photo_bytes = loop.run_until_complete(photo_file.download_as_bytearray())
-        loop.close()
+        # Download the photo
+        photo_file = await bot.get_file(channel_data["photo_id"])
+        photo_bytes = await photo_file.download_as_bytearray()
         
-        return Response(photo_bytes, status=200, content_type='image/jpeg',
-                        headers={'Cache-Control': 'public, max-age=86400'})
+        # Return as image
+        return StreamingResponse(
+            io.BytesIO(photo_bytes),
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "Content-Disposition": f"inline; filename=channel_{channel_id}.jpg"
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to get channel photo for {channel_id}: {e}")
         # Fallback to default
         default_url = "https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg"
+        import requests
         response = requests.get(default_url)
-        return Response(response.content, status=200, content_type='image/svg+xml')
+        return StreamingResponse(
+            io.BytesIO(response.content),
+            media_type="image/svg+xml",
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Content-Disposition": "inline; filename=default_channel.svg"
+            }
+        )
 
-@app.route('/join')
-def join_page():
+@app.get("/join")
+async def join_page(request: Request, token: str, user_id: int):
     """Join page after verification."""
-    token = request.args.get('token')
-    user_id = request.args.get('user_id', type=int)
-    
-    if not token or not user_id:
-        abort(400, "Missing token or user_id")
-    
+    # Check if token is valid
     link_data = links_collection.find_one({"_id": token, "active": True})
     if not link_data:
-        abort(404, "Link not found")
+        raise HTTPException(status_code=404, detail="Link not found")
     
     # Check membership
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    is_member = loop.run_until_complete(verify_user_membership(user_id))
-    loop.close()
-    
+    is_member = await verify_user_membership(user_id)
     if not is_member:
-        # Track failed join
+        # Track failed join attempt (potential ad revenue lost)
         try:
             ad_impressions_collection.insert_one({
                 "user_id": user_id,
@@ -1635,9 +1672,11 @@ def join_page():
             })
         except Exception as e:
             logger.error(f"Failed to track failed join: {e}")
-        abort(303, "Not a member of support channels")
+        
+        # Redirect to verification page
+        raise HTTPException(status_code=303, detail="Not a member of support channels")
     
-    # Track successful join
+    # Track successful join attempt (ad will be shown)
     try:
         ad_impressions_collection.insert_one({
             "user_id": user_id,
@@ -1648,34 +1687,47 @@ def join_page():
     except Exception as e:
         logger.error(f"Failed to track join page view: {e}")
     
-    return render_template('join.html',
-                           token=token,
-                           user_id=user_id,
-                           tutorial_link="https://t.me/team_secret_tutorial_video/5",
-                           contact_bot="https://t.me/team_secret_cont_bot")
+    return templates.TemplateResponse("join.html", {
+        "request": request, 
+        "token": token,
+        "user_id": user_id,  # Pass user_id for tracking
+        "tutorial_link": "https://t.me/team_secret_tutorial_video/5",
+        "contact_bot": "https://t.me/team_secret_cont_bot"
+    })
 
-@app.route('/getgrouplink/<token>')
-def get_group_link(token):
+@app.get("/getgrouplink/{token}")
+async def get_group_link(token: str):
     """Get real group/channel link."""
     link_data = links_collection.find_one({"_id": token, "active": True})
-    if not link_data:
-        abort(404, "Link not found")
     
-    links_collection.update_one({"_id": token}, {"$inc": {"clicks": 1}})
-    return jsonify({"url": link_data.get("telegram_link") or link_data.get("group_link")})
+    if link_data:
+        links_collection.update_one(
+            {"_id": token},
+            {"$inc": {"clicks": 1}}
+        )
+        
+        # Track successful link access (after ad view)
+        return {"url": link_data.get("telegram_link") or link_data.get("group_link")}
+    else:
+        raise HTTPException(status_code=404, detail="Link not found")
 
-@app.route('/ad_stats')
-def ad_stats():
+@app.get("/ad_stats")
+async def get_ad_stats():
     """Get ad statistics (admin only)."""
-    # For simplicity, we skip authentication here; you may add API key check.
+    admin_id = int(os.environ.get("ADMIN_ID", 0))
+    
+    # You would need to implement authentication here
+    # For now, return basic stats
+    
     today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
     stats = {
         "total_impressions": ad_impressions_collection.count_documents({}),
         "today_impressions": ad_impressions_collection.count_documents({"timestamp": {"$gte": today}}),
         "impressions_by_type": list(ad_impressions_collection.aggregate([
             {"$group": {"_id": "$ad_type", "count": {"$sum": 1}}}
         ])),
-        "estimated_revenue": ad_impressions_collection.count_documents({}) * 0.01,
+        "estimated_revenue": ad_impressions_collection.count_documents({}) * 0.01,  # $0.01 per impression
         "top_users": list(ad_impressions_collection.aggregate([
             {"$group": {"_id": "$user_id", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
@@ -1684,26 +1736,5 @@ def ad_stats():
         "contact_bot": "https://t.me/team_secret_cont_bot",
         "tutorial_link": "https://t.me/team_secret_tutorial_video/5"
     }
-    return jsonify(stats)
-
-@app.route('/<token>', methods=['POST'])
-def telegram_webhook(token):
-    """Telegram webhook endpoint."""
-    if token != os.environ.get("TELEGRAM_TOKEN"):
-        abort(403, "Invalid token")
     
-    update_data = request.get_json()
-    update = Update.de_json(update_data, telegram_bot_app.bot)
-    
-    # Process update asynchronously
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(telegram_bot_app.process_update(update))
-    loop.close()
-    
-    return Response(status=200)
-
-if __name__ == "__main__":
-    # Run the Flask app
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    return stats
