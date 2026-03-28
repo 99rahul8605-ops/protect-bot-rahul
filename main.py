@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse
 
 # --- Telegram Imports ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ChatMember, ChatInviteLink
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, TelegramError
 
@@ -70,13 +70,14 @@ def reset_and_set_commands():
         
         url = f"https://api.telegram.org/bot{bot_token}/setMyCommands"
         
-        # New premium-style commands
+        # New premium-style commands with /list added
         commands = [
             {"command": "start", "description": "🚀 Start the bot"},
             {"command": "protect", "description": "🔗 Create protected link"},
             {"command": "revoke", "description": "❌ Revoke active links"},
             {"command": "broadcast", "description": "📢 Broadcast (Admin)"},
             {"command": "stats", "description": "📊 Statistics (Admin)"},
+            {"command": "list", "description": "📚 Get free resources list"},
             {"command": "help", "description": "📖 Show help guide"}
         ]
         
@@ -827,6 +828,7 @@ I help you keep your channel links safe & secure.
 🛠 Commands:
 • /start – Start the bot
 • /protect – Generate protected link
+• /list – Get free resources list
 • /help – Show help options
 
 🌟 Features:
@@ -1375,6 +1377,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• `/start` - Start the bot\n"
         "• `/protect https://t.me/channel` - Create secure link\n"
         "• `/revoke` - Revoke access\n"
+        "• `/list` - Get free resources list\n"
         "• `/broadcast` - Broadcast message (Admin)\n"
         "• `/stats` - View statistics (Admin)\n"
         "• `/help` - This message\n\n"
@@ -1397,6 +1400,24 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         disable_web_page_preview=True
     )
 
+async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send free resources list button."""
+    # Create inline button with the given URL
+    keyboard = [[InlineKeyboardButton(
+        "📚 Free Resources List",
+        url="https://telegra.ph/Free-Lecturess-02-27",
+        api_kwargs={'style': 'primary'}
+    )]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "📚 *Free Resources*\n\n"
+        "Click the button below to access our collection of free lectures and study materials.",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
+
 async def store_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Store user activity."""
     if update.message and update.message.chat.type == "private":
@@ -1412,11 +1433,11 @@ telegram_bot_app.add_handler(CommandHandler("protect", protect_command))
 telegram_bot_app.add_handler(CommandHandler("revoke", revoke_command))
 telegram_bot_app.add_handler(CommandHandler("broadcast", broadcast_command))
 telegram_bot_app.add_handler(CommandHandler("stats", stats_command))
+telegram_bot_app.add_handler(CommandHandler("list", list_command))  # <-- new handler
 telegram_bot_app.add_handler(CommandHandler("help", help_command))
 telegram_bot_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, store_message))
 
 # Add callback handler
-from telegram.ext import CallbackQueryHandler
 telegram_bot_app.add_handler(CallbackQueryHandler(button_callback))
 
 # --- FastAPI Setup ---
