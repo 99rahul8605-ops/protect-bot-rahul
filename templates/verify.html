@@ -64,40 +64,15 @@ body {
   z-index: -18;
 }
 
-.orb1 {
-  background: radial-gradient(circle, #ff00cc, #3333ff);
-  top: -20%;
-  left: -20%;
-  animation-duration: 22s;
-}
-
-.orb2 {
-  background: radial-gradient(circle, #00ffcc, #ff44aa);
-  bottom: -30%;
-  right: -10%;
-  width: 70vw;
-  height: 70vw;
-  animation-duration: 25s;
-  animation-delay: -5s;
-}
-
-.orb3 {
-  background: radial-gradient(circle, #ffaa33, #ff3399);
-  top: 40%;
-  left: 30%;
-  width: 50vw;
-  height: 50vw;
-  filter: blur(120px);
-  opacity: 0.35;
-  animation-duration: 30s;
-}
+.orb1 { background: radial-gradient(circle, #ff00cc, #3333ff); top: -20%; left: -20%; animation-duration: 22s; }
+.orb2 { background: radial-gradient(circle, #00ffcc, #ff44aa); bottom: -30%; right: -10%; width: 70vw; height: 70vw; animation-duration: 25s; animation-delay: -5s; }
+.orb3 { background: radial-gradient(circle, #ffaa33, #ff3399); top: 40%; left: 30%; width: 50vw; height: 50vw; filter: blur(120px); opacity: 0.35; animation-duration: 30s; }
 
 @keyframes floatOrb {
   0% { transform: translate(0, 0) scale(1); opacity: 0.3; }
   100% { transform: translate(5%, 8%) scale(1.2); opacity: 0.6; }
 }
 
-/* animated scanlines */
 .scanlines {
   position: fixed;
   top: 0;
@@ -115,7 +90,6 @@ body {
   100% { background-position: 0 20px; }
 }
 
-/* glitch overlay */
 .glitch-overlay {
   position: fixed;
   inset: 0;
@@ -147,7 +121,10 @@ body {
   margin: auto;
   transition: all 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1);
   animation: containerFloat 6s infinite alternate ease-in-out;
-  overflow: hidden;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .container::before {
@@ -266,49 +243,49 @@ h1 {
   100% { width: 0%; opacity: 0; }
 }
 
-/* ========== ADVANCED LOADING ANIMATION ========== */
-.loading-container {
-  display: flex;
-  flex-direction: column;
+/* ========== ADVANCED LOADING (CENTERED) ========== */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: none;
   align-items: center;
   justify-content: center;
-  margin: 20px 0;
+  flex-direction: column;
+}
+
+.loading-container {
+  text-align: center;
 }
 
 .loading-ring {
   position: relative;
-  width: 70px;
-  height: 70px;
-  margin-bottom: 20px;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
 }
 
 .loading-ring div {
   box-sizing: border-box;
   display: block;
   position: absolute;
-  width: 60px;
-  height: 60px;
-  margin: 4px;
+  width: 64px;
+  height: 64px;
+  margin: 8px;
   border: 4px solid transparent;
   border-radius: 50%;
   animation: ring-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
 
-.loading-ring div:nth-child(1) {
-  border-top-color: #0ff;
-  animation-delay: -0.45s;
-}
-.loading-ring div:nth-child(2) {
-  border-right-color: #f0f;
-  animation-delay: -0.3s;
-}
-.loading-ring div:nth-child(3) {
-  border-bottom-color: #ffaa33;
-  animation-delay: -0.15s;
-}
-.loading-ring div:nth-child(4) {
-  border-left-color: #0f0;
-}
+.loading-ring div:nth-child(1) { border-top-color: #0ff; animation-delay: -0.45s; }
+.loading-ring div:nth-child(2) { border-right-color: #f0f; animation-delay: -0.3s; }
+.loading-ring div:nth-child(3) { border-bottom-color: #ffaa33; animation-delay: -0.15s; }
+.loading-ring div:nth-child(4) { border-left-color: #0f0; }
 
 @keyframes ring-spin {
   0% { transform: rotate(0deg); }
@@ -316,7 +293,7 @@ h1 {
 }
 
 .loading-text {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 2px;
   background: linear-gradient(90deg, #0ff, #f0f);
@@ -331,7 +308,7 @@ h1 {
   100% { opacity: 1; text-shadow: 0 0 10px cyan; }
 }
 
-/* BUTTONS */
+/* ========== BUTTONS ========== */
 .verify-button, .join-now-button, .check-again-button, .join-all-button, .join-channel-button, .action-button {
   padding: 12px 24px;
   font-size: 0.95rem;
@@ -348,6 +325,8 @@ h1 {
   margin: 6px 4px;
   box-shadow: 0 0 12px rgba(0,255,255,0.3);
   border: 1px solid rgba(0,255,255,0.6);
+  display: inline-block;
+  text-decoration: none;
 }
 
 .verify-button:hover, .join-now-button:hover, .check-again-button:hover, .join-all-button:hover, .action-button:hover {
@@ -362,29 +341,30 @@ h1 {
   background: linear-gradient(135deg, rgba(255,100,0,0.3), rgba(255,0,100,0.3));
 }
 
-/* channels list - mobile fix */
+/* ========== CHANNELS LIST (MOBILE FIXED) ========== */
 .channels-list {
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(12px);
   border-radius: 28px;
   padding: 12px;
   border: 1px solid rgba(0,255,255,0.3);
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
   margin-bottom: 15px;
+  width: 100%;
 }
 
 .channel-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  margin-bottom: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
   background: linear-gradient(115deg, rgba(10,30,55,0.7), rgba(30,10,55,0.7));
   border-radius: 18px;
   border-left: 4px solid #0ff;
   transition: all 0.2s;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -394,8 +374,8 @@ h1 {
 }
 
 .channel-logo {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid cyan;
@@ -405,11 +385,12 @@ h1 {
 .channel-info {
   flex: 1;
   min-width: 120px;
+  text-align: left;
 }
 
 .channel-name {
   font-weight: bold;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   letter-spacing: 0.5px;
   word-break: break-word;
 }
@@ -423,7 +404,7 @@ h1 {
 .channel-status {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -444,18 +425,19 @@ h1 {
   border-radius: 24px;
   padding: 14px;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   margin-bottom: 15px;
+  width: 100%;
 }
 
-/* thank you section - mobile fixes */
+/* ========== THANK YOU SECTION (MOBILE FIX) ========== */
 #thank-you-section {
   width: 100%;
   padding: 0 5px;
 }
 
 .thank-you-message {
-  font-size: 0.95rem;
+  font-size: 1rem;
   margin: 15px 0;
   line-height: 1.4;
 }
@@ -466,7 +448,7 @@ h1 {
   padding: 12px;
   margin: 15px 0;
   width: 100%;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .thank-you-button-container {
@@ -490,48 +472,25 @@ h1 {
   z-index: 10000;
 }
 
-/* responsive */
+/* ========== RESPONSIVE ========== */
 @media(max-width: 550px) {
-  body {
-    padding: 12px;
-  }
-  .container {
-    padding: 24px 16px;
-    border-radius: 32px;
-  }
-  .channel-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .channel-status {
-    width: 100%;
-    justify-content: space-between;
-    margin-top: 6px;
-  }
-  .join-channel-button {
-    align-self: flex-end;
-  }
-  .verify-button, .join-now-button, .check-again-button {
-    padding: 10px 18px;
-    font-size: 0.85rem;
-  }
-  .action-button {
-    min-width: 120px;
-    padding: 10px 16px;
-  }
-  .fullname-display {
-    font-size: 1.2rem;
-    padding: 6px 20px;
-  }
+  body { padding: 12px; }
+  .container { padding: 20px 16px; border-radius: 32px; }
+  .channel-item { flex-direction: column; align-items: flex-start; }
+  .channel-status { width: 100%; justify-content: space-between; margin-top: 6px; }
+  .join-channel-button { align-self: flex-end; }
+  .verify-button, .join-now-button, .check-again-button { padding: 10px 18px; font-size: 0.85rem; }
+  .action-button { min-width: 120px; padding: 10px 16px; }
+  .fullname-display { font-size: 1.2rem; padding: 6px 20px; }
+  .loading-ring { width: 70px; height: 70px; }
+  .loading-ring div { width: 54px; height: 54px; margin: 6px; }
 }
 </style>
 </head>
 <body>
 
 <!-- animated bg -->
-<div class="bg-canvas">
-  <canvas id="particleNetwork"></canvas>
-</div>
+<div class="bg-canvas"><canvas id="particleNetwork"></canvas></div>
 <div class="gradient-orb orb1"></div>
 <div class="gradient-orb orb2"></div>
 <div class="gradient-orb orb3"></div>
@@ -555,9 +514,9 @@ h1 {
   <div id="fullname" class='fullname-display'>Loading...</div>
   <div class='scan-line'></div>
   
-  <div class='content-area'>
+  <div class='content-area' style="width:100%;">
     <!-- Initial State -->
-    <div id="initial-state" style="display:flex; flex-direction:column; align-items:center;">
+    <div id="initial-state" style="display:flex; flex-direction:column; align-items:center; width:100%;">
       <div style="background:rgba(0,255,255,0.1); padding:10px 16px; border-radius:60px; margin-bottom:20px; font-size:0.85rem;">
         <i class="fas fa-shield-alt"></i> JOIN ALL REQUIRED CHANNELS TO ACCESS
       </div>
@@ -567,16 +526,16 @@ h1 {
     <!-- Result Section -->
     <div id="result-section" style="display:none; width:100%;">
       <div id="result-message" class='result-message'></div>
-      <div id="progress-container" style="display:none; margin:15px 0;">
+      <div id="progress-container" style="display:none; margin:15px 0; width:100%;">
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>VERIFICATION PROGRESS</span><span id="progress-percentage">0%</span></div>
         <div style="background:#111; border-radius:20px; height:6px; overflow:hidden;"><div id="progress-fill" class="progress-fill"></div></div>
       </div>
-      <div id="channels-container" style="display:none;"><div id="channels-list" class="channels-list"></div></div>
-      <div id="action-buttons" style="margin-top:15px;"></div>
+      <div id="channels-container" style="display:none; width:100%;"><div id="channels-list" class="channels-list"></div></div>
+      <div id="action-buttons" style="margin-top:15px; width:100%; display:flex; flex-wrap:wrap; justify-content:center;"></div>
     </div>
     
     <!-- Thank You -->
-    <div id="thank-you-section" style="display:none; flex-direction:column; align-items:center;">
+    <div id="thank-you-section" style="display:none; flex-direction:column; align-items:center; width:100%;">
       <div style="width:70px; height:70px; border-radius:50%; background:linear-gradient(135deg,#0f0,#0ff); display:flex; align-items:center; justify-content:center; margin-bottom:15px;">
         <i class="fas fa-check" style="font-size:2.5rem; color:white;"></i>
       </div>
@@ -591,16 +550,14 @@ h1 {
         <button id="joinNowButtonThankYou" class="action-button">JOIN NOW</button>
       </div>
     </div>
-    
-    <!-- Advanced Loading Animation -->
-    <div id="loading" style="display:none;">
-      <div class="loading-container">
-        <div class="loading-ring">
-          <div></div><div></div><div></div><div></div>
-        </div>
-        <div class="loading-text">VERIFYING MEMBERSHIP...</div>
-      </div>
-    </div>
+  </div>
+</div>
+
+<!-- Advanced Loading Overlay (centered) -->
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="loading-container">
+    <div class="loading-ring"><div></div><div></div><div></div><div></div></div>
+    <div class="loading-text">VERIFYING MEMBERSHIP...</div>
   </div>
 </div>
 
@@ -683,14 +640,14 @@ function openTelegramLink(url) {
 function showThankYouPage() {
   document.getElementById('result-section').style.display = 'none';
   document.getElementById('thank-you-section').style.display = 'flex';
-  document.getElementById('loading').style.display = 'none';
+  document.getElementById('loadingOverlay').style.display = 'none';
 }
 
 function resetToInitialState() {
   document.getElementById('result-section').style.display = 'none';
   document.getElementById('thank-you-section').style.display = 'none';
   document.getElementById('initial-state').style.display = 'flex';
-  document.getElementById('loading').style.display = 'none';
+  document.getElementById('loadingOverlay').style.display = 'none';
   const verifyBtn = document.getElementById('verifyBtn');
   if(verifyBtn) verifyBtn.disabled = false;
   isProcessingJoin = false;
@@ -700,11 +657,11 @@ function resetToInitialState() {
 async function joinGroup() {
   if (isProcessingJoin) return;
   const joinBtn = document.getElementById('joinNowBtn');
-  const loadingDiv = document.getElementById('loading');
+  const overlay = document.getElementById('loadingOverlay');
   isProcessingJoin = true;
   if(joinBtn) { joinBtn.disabled = true; joinBtn.querySelector('.button-text').textContent = 'ACCESSING...'; }
-  loadingDiv.style.display = 'flex';
-  loadingDiv.querySelector('.loading-text').innerHTML = '<i class="fas fa-shield-haltered"></i> SECURING ACCESS...';
+  overlay.style.display = 'flex';
+  overlay.querySelector('.loading-text').innerHTML = '<i class="fas fa-shield-haltered"></i> SECURING ACCESS...';
   
   try {
     const groupUrl = await getProtectedLink();
@@ -712,7 +669,7 @@ async function joinGroup() {
     window.protectedUrl = groupUrl;
     
     if(isAdSDKAvailable()) {
-      loadingDiv.querySelector('.loading-text').innerHTML = '<i class="fas fa-ad"></i> LOADING CONTENT...';
+      overlay.querySelector('.loading-text').innerHTML = '<i class="fas fa-ad"></i> LOADING CONTENT...';
       isAdShowing = true;
       let adCompleted = false;
       const timeout = setTimeout(() => { 
@@ -721,7 +678,7 @@ async function joinGroup() {
       show_10391340('pop').then(() => {
         clearTimeout(timeout);
         adCompleted=true; isAdShowing=false;
-        loadingDiv.querySelector('.loading-text').innerHTML = '<i class="fas fa-check-circle"></i> GRANTING ACCESS';
+        overlay.querySelector('.loading-text').innerHTML = '<i class="fas fa-check-circle"></i> GRANTING ACCESS';
         setTimeout(() => completeAccessProcess(), 800);
       }).catch(() => { 
         clearTimeout(timeout); adCompleted=true; isAdShowing=false; completeAccessProcess();
@@ -736,8 +693,8 @@ async function joinGroup() {
 }
 
 function completeAccessProcess() {
-  const loadingDiv = document.getElementById('loading');
-  loadingDiv.querySelector('.loading-text').innerHTML = '<i class="fas fa-rocket"></i> REDIRECTING...';
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.querySelector('.loading-text').innerHTML = '<i class="fas fa-rocket"></i> REDIRECTING...';
   setTimeout(() => {
     const opened = openTelegramLink(window.protectedUrl);
     if(!opened) alert(`Please open manually: ${window.protectedUrl}`);
@@ -752,7 +709,7 @@ function completeAccessProcess() {
 function resetAccessButton() {
   const joinBtn = document.getElementById('joinNowBtn');
   if(joinBtn) { joinBtn.disabled = false; joinBtn.querySelector('.button-text').textContent = 'Access Protected Content'; }
-  document.getElementById('loading').style.display = 'none';
+  document.getElementById('loadingOverlay').style.display = 'none';
   isProcessingJoin = false; isAdShowing = false;
 }
 
@@ -762,7 +719,9 @@ async function verifyMembership() {
   const verifyBtn = document.getElementById('verifyBtn');
   verifyBtn.disabled = true;
   verifyBtn.querySelector('.button-text').textContent = 'VERIFYING...';
-  document.getElementById('loading').style.display = 'flex';
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.style.display = 'flex';
+  overlay.querySelector('.loading-text').innerHTML = 'VERIFYING MEMBERSHIP...';
   document.getElementById('initial-state').style.display = 'none';
   document.getElementById('result-section').style.display = 'none';
   
@@ -781,7 +740,7 @@ async function verifyMembership() {
     console.error(e);
     showResult('❌ ERROR: Verification failed. Please retry.', false, [], 0);
   } finally {
-    document.getElementById('loading').style.display = 'none';
+    overlay.style.display = 'none';
     verifyBtn.disabled = false;
     verifyBtn.querySelector('.button-text').textContent = 'VERIFY MEMBERSHIP';
   }
@@ -844,6 +803,7 @@ function showResult(message, isSuccess, channels, total) {
   document.getElementById('initial-state').style.display = 'none';
   document.getElementById('result-section').style.display = 'flex';
   
+  // Use event delegation or direct assignment after a short delay to ensure DOM is ready
   setTimeout(() => {
     const joinNow = document.getElementById('joinNowBtn');
     if(joinNow) joinNow.onclick = joinGroup;
@@ -862,7 +822,7 @@ function showResult(message, isSuccess, channels, total) {
         setTimeout(() => alert(`Opened ${opened} unjoined channel(s) in new tabs. Join them and verify again.`), 200);
       };
     }
-  }, 50);
+  }, 100);
 }
 
 // particle background
