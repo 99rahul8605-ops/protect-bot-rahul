@@ -1,4 +1,4 @@
-7import os
+import os
 import logging
 import uuid
 import base64
@@ -1409,7 +1409,7 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         api_kwargs={'style': 'primary'}
     )]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
+    
     await update.message.reply_text(
         "📚 *Free Resources*\n\n"
         "Click the button below to access our collection of free lectures and study materials.",
