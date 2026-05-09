@@ -1405,7 +1405,7 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Create inline button with the given URL
     keyboard = [[InlineKeyboardButton(
         "📚 Free Resources List",
-        url="https://telegra.ph/Free-Lecturess-02-27",
+        url="COMMING SOON....",
         api_kwargs={'style': 'primary'}
     )]]
     reply_markup = InlineKeyboardMarkup(keyboard)
