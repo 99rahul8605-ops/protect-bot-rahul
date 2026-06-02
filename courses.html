@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Team Secret — Courses</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#0a0a0f; --surface:#111118; --card:#16161f; --card2:#1c1c28;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+  --accent:#7c5cfc; --accent2:#e040fb; --green:#22c55e; --red:#ef4444;
+  --gold:#f5c842; --text:#f0eeff; --muted:#8a889a; --radius:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
+
+/* ── SCREENS ── */
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s ease;
+  will-change:transform;}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none;}
+.screen.slide-left{transform:translateX(-100%);opacity:0;pointer-events:none;}
+
+/* Ambient blobs */
+.screen::before{content:'';position:fixed;top:-200px;left:-200px;
+  width:500px;height:500px;
+  background:radial-gradient(circle,rgba(124,92,252,.1) 0%,transparent 70%);
+  pointer-events:none;z-index:0;}
+
+.wrap{position:relative;z-index:1;max-width:680px;margin:0 auto;padding:0 16px 80px;}
+
+/* ── TOP BAR ── */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(10,10,15,.85);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:12px 16px;
+  display:flex;align-items:center;gap:12px;
+}
+.back-btn{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,.06);border:1px solid var(--border2);
+  color:var(--text);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;transition:.15s;
+}
+.back-btn:active{background:rgba(255,255,255,.12);}
+.topbar-title{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;flex:1;}
+.admin-icon-btn{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.25);
+  color:var(--gold);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;transition:.15s;
+}
+.admin-icon-btn:active{background:rgba(245,200,66,.2);}
+
+/* ── HEADER (courses screen) ── */
+.hero{text-align:center;padding:40px 0 28px;}
+.brand-logo{width:60px;height:60px;border-radius:50%;
+  border:2px solid var(--accent);
+  box-shadow:0 0 24px rgba(124,92,252,.4);
+  object-fit:cover;margin-bottom:14px;}
+.brand-tag{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:4px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(24px,6vw,36px);
+  font-weight:800;line-height:1.15;
+  background:linear-gradient(135deg,#f0eeff 0%,var(--accent2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;margin-bottom:8px;}
+.hero p{color:var(--muted);font-size:14px;}
+
+/* ── COURSE LIST ── */
+.course-item{
+  display:flex;align-items:center;gap:14px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 18px;
+  margin-bottom:12px;cursor:pointer;
+  transition:border-color .2s,transform .15s,box-shadow .2s;
+  animation:fadeUp .4s ease both;
+}
+.course-item:active{transform:scale(.98);}
+.course-item:hover{border-color:rgba(124,92,252,.35);box-shadow:0 6px 24px rgba(124,92,252,.1);}
+.course-icon{
+  width:44px;height:44px;border-radius:12px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+}
+.course-info{flex:1;min-width:0;}
+.course-info h3{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.course-info span{font-size:12px;color:var(--muted);}
+.course-chevron{color:var(--muted);flex-shrink:0;}
+
+/* ── BATCH GRID ── */
+.batches-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+  padding-top:4px;
+}
+@media(min-width:480px){.batches-grid{grid-template-columns:repeat(3,1fr);}}
+
+.batch-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  cursor:pointer;
+  transition:border-color .2s,transform .15s,box-shadow .2s;
+  animation:fadeUp .35s ease both;
+}
+.batch-card:active{transform:scale(.96);}
+.batch-card:hover{border-color:rgba(124,92,252,.35);box-shadow:0 8px 28px rgba(124,92,252,.12);}
+
+.batch-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;
+  background:linear-gradient(135deg,#1a1a2e,#0f0f1a);}
+.batch-thumb-placeholder{
+  width:100%;aspect-ratio:16/9;
+  background:linear-gradient(135deg,#1a1a2e,#0f0f1a);
+  display:flex;align-items:center;justify-content:center;
+}
+.batch-thumb-placeholder svg{opacity:.2;}
+
+.batch-label{padding:10px 12px 12px;}
+.batch-label h4{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;
+  line-height:1.3;color:var(--text);}
+.batch-label .join-hint{
+  font-size:11px;color:var(--accent);margin-top:5px;
+  display:flex;align-items:center;gap:4px;font-weight:600;
+}
+
+/* ── POPUP OVERLAY ── */
+.overlay{
+  position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(8px);
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s ease;
+}
+.overlay.show{opacity:1;pointer-events:all;}
+
+.popup{
+  width:100%;max-width:480px;
+  background:linear-gradient(180deg,#1e1e2e 0%,#16161f 100%);
+  border:1px solid var(--border2);
+  border-bottom:none;
+  border-radius:28px 28px 0 0;
+  padding:0 0 36px;
+  transform:translateY(100%);
+  transition:transform .35s cubic-bezier(.34,1.15,.64,1);
+  box-shadow:0 -8px 40px rgba(0,0,0,.5);
+}
+.overlay.show .popup{transform:translateY(0);}
+
+.popup-handle{width:44px;height:4px;border-radius:2px;
+  background:rgba(255,255,255,.18);margin:14px auto 0;}
+
+.popup-img-placeholder{
+  height:130px;
+  background:linear-gradient(135deg,#1a1a2e,#0f0f1a);
+  display:flex;align-items:center;justify-content:center;
+  border-radius:16px;margin:16px 20px 0;
+  border:1px solid var(--border);
+}
+.popup-img-container{
+  margin:16px 20px 0;border-radius:16px;overflow:hidden;
+  border:1px solid var(--border);
+}
+.popup-img{width:100%;max-height:180px;object-fit:cover;display:block;}
+
+.popup-body{padding:18px 20px 0;}
+.popup-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(124,92,252,.12);border:1px solid rgba(124,92,252,.25);
+  border-radius:20px;padding:4px 10px;
+  font-size:11px;color:var(--accent);font-weight:600;
+  letter-spacing:.5px;margin-bottom:10px;
+}
+.popup-name{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;
+  margin-bottom:4px;line-height:1.2;}
+.popup-course{font-size:13px;color:var(--muted);margin-bottom:18px;}
+
+.popup-divider{height:1px;background:var(--border);margin:0 20px 18px;}
+
+.join-btn{
+  width:100%;padding:15px;border-radius:16px;border:none;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+  color:#fff;font-family:'Syne',sans-serif;font-weight:700;font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:opacity .2s,transform .15s,box-shadow .2s;
+  box-shadow:0 4px 20px rgba(124,92,252,.4);
+  letter-spacing:.3px;
+}
+.join-btn:active{transform:scale(.97);opacity:.9;}
+.join-btn:hover{box-shadow:0 6px 28px rgba(124,92,252,.55);}
+.join-btn.sent{
+  background:linear-gradient(135deg,var(--green),#16a34a);
+  box-shadow:0 4px 20px rgba(34,197,94,.35);
+}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty svg{opacity:.25;margin-bottom:14px;}
+.empty p{font-size:15px;}
+
+/* ── ADMIN PANEL ── */
+.admin-section-title{
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;color:var(--muted);
+  margin:24px 0 12px;
+}
+.add-box{background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 18px;margin-bottom:8px;}
+.inp{
+  background:rgba(255,255,255,.04);border:1px solid var(--border2);
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;
+  padding:10px 14px;border-radius:10px;outline:none;width:100%;transition:.2s;
+}
+.inp:focus{border-color:var(--accent);background:rgba(124,92,252,.06);}
+.inp::placeholder{color:var(--muted);}
+.inp-row{display:flex;gap:8px;margin-bottom:10px;}
+.btn{
+  padding:10px 18px;border-radius:10px;font-family:'Syne',sans-serif;
+  font-weight:700;font-size:13px;cursor:pointer;border:none;
+  transition:.2s;white-space:nowrap;flex-shrink:0;
+}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+.btn-primary:active{opacity:.85;}
+.btn-danger{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.btn-danger:active{background:rgba(239,68,68,.2);}
+.btn-green{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.btn-green:active{background:rgba(34,197,94,.2);}
+.btn-sm{padding:6px 12px;font-size:12px;}
+
+.admin-course-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);margin-bottom:14px;overflow:hidden;
+  animation:fadeUp .35s ease both;
+}
+.admin-course-head{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,.02);
+}
+.adot{width:7px;height:7px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));flex-shrink:0;}
+.admin-course-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;flex:1;}
+
+.admin-batches{padding:10px 16px 4px;}
+.admin-batch-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:10px;margin-bottom:6px;
+  background:rgba(255,255,255,.03);border:1px solid var(--border);
+}
+.admin-batch-thumb{
+  width:38px;height:38px;border-radius:8px;flex-shrink:0;
+  object-fit:cover;background:rgba(124,92,252,.15);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.admin-batch-thumb img{width:100%;height:100%;object-fit:cover;}
+.admin-batch-info{flex:1;min-width:0;}
+.admin-batch-info .bname{font-size:13px;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.admin-batch-info .blink{font-size:11px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.del-btn{background:none;border:none;color:var(--red);cursor:pointer;
+  opacity:.55;padding:6px;border-radius:6px;transition:.15s;flex-shrink:0;}
+.del-btn:active{opacity:1;background:rgba(239,68,68,.1);}
+
+.add-batch-area{padding:10px 16px 16px;border-top:1px solid var(--border);
+  background:rgba(255,255,255,.01);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+@media(max-width:400px){.form-grid{grid-template-columns:1fr;}}
+.file-label{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.04);border:1px dashed var(--border2);
+  color:var(--muted);font-size:12px;padding:9px 12px;
+  border-radius:10px;cursor:pointer;transition:.2s;
+}
+.file-label:active{border-color:var(--accent);color:var(--accent);}
+.file-label input{display:none;}
+.pic-preview{width:36px;height:36px;border-radius:6px;
+  object-fit:cover;display:none;border:1px solid var(--border2);}
+.add-batch-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;}
+.no-batches{font-size:12px;color:var(--muted);padding:4px 0 8px;font-style:italic;}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);
+  z-index:200;background:var(--card2);border:1px solid var(--border2);
+  color:var(--text);padding:10px 20px;border-radius:12px;
+  font-size:13px;opacity:0;transition:.3s cubic-bezier(.34,1.4,.64,1);
+  white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+#toast.success{border-color:rgba(34,197,94,.4);}
+#toast.error{border-color:rgba(239,68,68,.4);}
+
+/* ── ANIMS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.course-item:nth-child(1){animation-delay:.04s}
+.course-item:nth-child(2){animation-delay:.08s}
+.course-item:nth-child(3){animation-delay:.12s}
+.course-item:nth-child(4){animation-delay:.16s}
+.course-item:nth-child(5){animation-delay:.2s}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     SCREEN 1: COURSES LIST
+══════════════════════════════════════ -->
+<div class="screen" id="screen-courses">
+  <div class="topbar">
+    <div class="topbar-title" id="topbar-title-courses">📚 Courses</div>
+    <div class="admin-icon-btn" id="admin-btn" style="display:none" onclick="goAdmin()" title="Admin Panel">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="hero">
+      <img class="brand-logo"
+           src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg"
+           alt="Team Secret"
+           onerror="this.style.display='none'"/>
+      <div class="brand-tag">Team Secret</div>
+      <h1>Courses & Batches</h1>
+      <p>Select a course to view available batches</p>
+    </div>
+    <div id="courses-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 2: BATCHES
+══════════════════════════════════════ -->
+<div class="screen hidden" id="screen-batches">
+  <div class="topbar">
+    <div class="back-btn" onclick="goBack('screen-courses')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </div>
+    <div class="topbar-title" id="batches-screen-title">Batches</div>
+  </div>
+  <div class="wrap" style="padding-top:16px;">
+    <div class="batches-grid" id="batches-grid"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN 3: ADMIN PANEL
+══════════════════════════════════════ -->
+<div class="screen hidden" id="screen-admin">
+  <div class="topbar">
+    <div class="back-btn" onclick="goBack('screen-courses')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </div>
+    <div class="topbar-title">⚙️ Admin Panel</div>
+  </div>
+  <div class="wrap" style="padding-top:8px;">
+    <div class="admin-section-title">Add New Course</div>
+    <div class="add-box">
+      <div class="inp-row">
+        <input class="inp" id="newCourseName" type="text" placeholder="Course name e.g. JEE Mains 2025" autocomplete="off"/>
+        <button class="btn btn-primary" onclick="addCourse()">+ Add</button>
+      </div>
+    </div>
+
+    <div class="admin-section-title">All Courses</div>
+    <div id="admin-courses-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     BATCH POPUP
+══════════════════════════════════════ -->
+<div class="overlay" id="batch-popup" onclick="closePopupOnBg(event)">
+  <div class="popup">
+    <div class="popup-handle"></div>
+    <div id="popup-img-wrap"></div>
+    <div class="popup-body">
+      <div class="popup-badge">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        BATCH
+      </div>
+      <div class="popup-name" id="popup-batch-name"></div>
+      <div class="popup-course" id="popup-course-name"></div>
+    </div>
+    <div class="popup-divider"></div>
+    <div style="padding:0 20px;">
+      <button class="join-btn" id="join-btn" onclick="joinBatch()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+        </svg>
+        Join Batch
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+const BASE_URL = "{{ base_url }}";
+const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+const USER_ID  = {{ user_id }};
+const ADMIN_ID_VAL = {{ user_id if is_admin else 0 }};
+
+let allCourses = [];
+let activeCourse = null;
+let activeBatch = null;
+
+// ── Telegram WebApp ───────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if(tg){ tg.ready(); tg.expand(); }
+
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  if(IS_ADMIN) document.getElementById('admin-btn').style.display = 'flex';
+  loadCourses();
+  document.getElementById('newCourseName').addEventListener('keydown', e => {
+    if(e.key === 'Enter') addCourse();
+  });
+});
+
+// ── Navigation ────────────────────────────────────────────────
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('hidden','slide-left');
+    if(s.id !== id) s.classList.add('hidden');
+  });
+}
+
+function goBack(targetId){
+  const current = document.querySelector('.screen:not(.hidden)');
+  if(current){ current.classList.add('slide-left'); }
+  setTimeout(()=>{ showScreen(targetId); }, 10);
+}
+
+function goAdmin(){
+  showScreen('screen-admin');
+  renderAdminCourses();
+}
+
+// ── Load Courses ──────────────────────────────────────────────
+async function loadCourses(){
+  try {
+    const res = await fetch(BASE_URL + '/api/courses');
+    allCourses = await res.json();
+    renderCoursesList();
+    if(IS_ADMIN) renderAdminCourses();
+  } catch(e){
+    document.getElementById('courses-list').innerHTML =
+      '<div class="empty"><p>Failed to load courses.</p></div>';
+  }
+}
+
+const EMOJIS = ['📘','📗','📙','📕','🎯','🚀','⭐','🔥','💡','🎓'];
+function courseEmoji(i){ return EMOJIS[i % EMOJIS.length]; }
+
+function renderCoursesList(){
+  const el = document.getElementById('courses-list');
+  if(!allCourses.length){
+    el.innerHTML = `<div class="empty">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="1.2">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      <p>No courses available yet.<br/>Check back soon!</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = allCourses.map((c,i) => `
+    <div class="course-item" onclick="openCourse('${c.id}')">
+      <div class="course-icon">${courseEmoji(i)}</div>
+      <div class="course-info">
+        <h3>${escHtml(c.name)}</h3>
+        <span>${c.batches.length} batch${c.batches.length !== 1 ? 'es' : ''} available</span>
+      </div>
+      <div class="course-chevron">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </div>
+    </div>`).join('');
+}
+
+// ── Open Course → Show Batches ────────────────────────────────
+function openCourse(courseId){
+  activeCourse = allCourses.find(c => c.id === courseId);
+  if(!activeCourse) return;
+
+  document.getElementById('batches-screen-title').textContent = activeCourse.name;
+  const grid = document.getElementById('batches-grid');
+
+  if(!activeCourse.batches.length){
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <p>No batches added yet.</p></div>`;
+  } else {
+    grid.innerHTML = activeCourse.batches.map((b,i) => `
+      <div class="batch-card" onclick="openBatchPopup('${b.id}')"
+           style="animation-delay:${i*0.05}s">
+        ${b.pic
+          ? `<img class="batch-thumb" src="${escHtml(b.pic)}" alt="${escHtml(b.name)}"
+               onerror="this.outerHTML='<div class=batch-thumb-placeholder><svg width=40 height=40 viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%237c5cfc\\' stroke-width=\\'1.2\\'><path d=\\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\\'/></svg></div>'"/>`
+          : `<div class="batch-thumb-placeholder">
+               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="1.2">
+                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+               </svg>
+             </div>`
+        }
+        <div class="batch-label">
+          <h4>${escHtml(b.name)}</h4>
+          <div class="join-hint">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Tap to join
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  showScreen('screen-batches');
+}
+
+// ── Batch Popup ───────────────────────────────────────────────
+function openBatchPopup(batchId){
+  if(!activeCourse) return;
+  activeBatch = activeCourse.batches.find(b => b.id === batchId);
+  if(!activeBatch) return;
+
+  document.getElementById('popup-batch-name').textContent = activeBatch.name;
+  document.getElementById('popup-course-name').textContent = '📘 ' + activeCourse.name;
+
+  const imgWrap = document.getElementById('popup-img-wrap');
+  if(activeBatch.pic){
+    imgWrap.innerHTML = `<div class="popup-img-container"><img class="popup-img" src="${escHtml(activeBatch.pic)}" alt="${escHtml(activeBatch.name)}"/></div>`;
+  } else {
+    imgWrap.innerHTML = `<div class="popup-img-placeholder">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="1.2">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg></div>`;
+  }
+
+  const btn = document.getElementById('join-btn');
+  btn.classList.remove('sent');
+  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Join Batch`;
+
+  document.getElementById('batch-popup').classList.add('show');
+}
+
+function closePopup(){
+  document.getElementById('batch-popup').classList.remove('show');
+  activeBatch = null;
+}
+
+function closePopupOnBg(e){
+  if(e.target === document.getElementById('batch-popup')) closePopup();
+}
+
+// ── Join → Open batch link ────────────────────────────────────
+function joinBatch(){
+  if(!activeBatch) return;
+  const btn = document.getElementById('join-btn');
+
+  btn.classList.add('sent');
+  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M20 6L9 17l-5-5"/></svg> Opening…`;
+
+  // Open the Telegram link
+  const link = activeBatch.link;
+  if(tg && tg.openLink){
+    tg.openLink(link);
+  } else if(tg && tg.openTelegramLink && link.includes('t.me')){
+    tg.openTelegramLink(link);
+  } else {
+    window.open(link, '_blank');
+  }
+
+  setTimeout(()=>{ closePopup(); }, 800);
+}
+
+// ── Admin: Render ─────────────────────────────────────────────
+function renderAdminCourses(){
+  const el = document.getElementById('admin-courses-list');
+  if(!allCourses.length){
+    el.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--muted);font-size:14px;">
+      No courses yet. Add one above!</div>`;
+    return;
+  }
+  el.innerHTML = allCourses.map(c => `
+    <div class="admin-course-card" id="ac-${c.id}">
+      <div class="admin-course-head">
+        <div class="adot"></div>
+        <div class="admin-course-name">${escHtml(c.name)}</div>
+        <span style="font-size:12px;color:var(--muted)">${c.batches.length} batch${c.batches.length!==1?'es':''}</span>
+        <button class="btn btn-danger btn-sm" onclick="deleteCourse('${c.id}','${escHtml(c.name)}')">Delete</button>
+      </div>
+
+      <div class="admin-batches" id="ab-${c.id}">
+        ${c.batches.length
+          ? c.batches.map(b => `
+            <div class="admin-batch-row" id="abr-${b.id}">
+              <div class="admin-batch-thumb">
+                ${b.pic ? `<img src="${escHtml(b.pic)}" alt=""/>` :
+                  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="1.5">
+                     <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18"/></svg>`}
+              </div>
+              <div class="admin-batch-info">
+                <div class="bname">${escHtml(b.name)}</div>
+                <div class="blink">${escHtml(b.link)}</div>
+              </div>
+              <button class="del-btn" onclick="deleteBatch('${c.id}','${b.id}')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                </svg>
+              </button>
+            </div>`).join('')
+          : `<div class="no-batches">No batches yet.</div>`
+        }
+      </div>
+
+      <div class="add-batch-area">
+        <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Add Batch</div>
+        <div class="form-grid">
+          <input class="inp" id="bn-${c.id}" type="text" placeholder="Batch name" autocomplete="off"/>
+          <input class="inp" id="bl-${c.id}" type="text" placeholder="https://t.me/..." autocomplete="off"/>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <label class="file-label" for="bp-${c.id}" style="flex:1;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="3" y="3" width="18" height="18" rx="3"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+            </svg>
+            <span id="fpl-${c.id}">Pic (optional)</span>
+            <input type="file" id="bp-${c.id}" accept="image/*" onchange="previewPic('${c.id}',this)"/>
+          </label>
+          <img class="pic-preview" id="pp-${c.id}" src="" alt=""/>
+        </div>
+        <div class="add-batch-actions">
+          <button class="btn btn-green" onclick="addBatch('${c.id}')">+ Add Batch</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Admin: Add Course ─────────────────────────────────────────
+async function addCourse(){
+  const name = document.getElementById('newCourseName').value.trim();
+  if(!name) return toast('Enter a course name','error');
+  try {
+    const res = await fetch(BASE_URL+'/admin/courses/add',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({admin_id:ADMIN_ID_VAL,name})
+    });
+    if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+    document.getElementById('newCourseName').value='';
+    toast('Course added!','success');
+    await loadCourses();
+    renderAdminCourses();
+  } catch(e){ toast('Network error','error'); }
+}
+
+// ── Admin: Delete Course ──────────────────────────────────────
+async function deleteCourse(courseId, name){
+  if(!confirm(`Delete "${name}" and all its batches?`)) return;
+  try {
+    const res = await fetch(BASE_URL+'/admin/courses/delete_course',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId})
+    });
+    if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+    toast('Deleted','success');
+    await loadCourses();
+    renderAdminCourses();
+  } catch(e){ toast('Network error','error'); }
+}
+
+// ── Admin: Pic Preview ────────────────────────────────────────
+function previewPic(courseId, input){
+  const file = input.files[0];
+  const preview = document.getElementById('pp-'+courseId);
+  const label   = document.getElementById('fpl-'+courseId);
+  if(!file){ preview.style.display='none'; return; }
+  if(file.size > 1048576){ toast('Max 1MB','error'); input.value=''; return; }
+  label.textContent = file.name.length>16 ? file.name.slice(0,16)+'…' : file.name;
+  const r = new FileReader();
+  r.onload = e => { preview.src=e.target.result; preview.style.display='block'; };
+  r.readAsDataURL(file);
+}
+
+// ── Admin: Add Batch ──────────────────────────────────────────
+async function addBatch(courseId){
+  const name = document.getElementById('bn-'+courseId).value.trim();
+  const link = document.getElementById('bl-'+courseId).value.trim();
+  const fileInput = document.getElementById('bp-'+courseId);
+  if(!name) return toast('Enter batch name','error');
+  if(!link||!link.startsWith('https://t.me/')) return toast('Enter valid t.me link','error');
+  let pic='';
+  if(fileInput.files[0]){
+    pic = await new Promise(res=>{
+      const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(fileInput.files[0]);
+    });
+  }
+  try {
+    const res = await fetch(BASE_URL+'/admin/courses/add_batch',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId,batch_name:name,batch_link:link,batch_pic:pic})
+    });
+    if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+    document.getElementById('bn-'+courseId).value='';
+    document.getElementById('bl-'+courseId).value='';
+    fileInput.value='';
+    document.getElementById('pp-'+courseId).style.display='none';
+    document.getElementById('fpl-'+courseId).textContent='Pic (optional)';
+    toast('Batch added!','success');
+    await loadCourses();
+    renderAdminCourses();
+  } catch(e){ toast('Network error','error'); }
+}
+
+// ── Admin: Delete Batch ───────────────────────────────────────
+async function deleteBatch(courseId, batchId){
+  if(!confirm('Delete this batch?')) return;
+  try {
+    const res = await fetch(BASE_URL+'/admin/courses/delete_batch',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId,batch_id:batchId})
+    });
+    if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+    document.getElementById('abr-'+batchId)?.remove();
+    toast('Batch deleted','success');
+    await loadCourses();
+  } catch(e){ toast('Network error','error'); }
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, type='success'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show '+type;
+  setTimeout(()=>t.className='',2500);
+}
+
+// ── Utils ─────────────────────────────────────────────────────
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
