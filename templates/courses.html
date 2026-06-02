@@ -313,6 +313,9 @@ body{
 .course-item:nth-child(4){animation-delay:.16s}
 .course-item:nth-child(5){animation-delay:.2s}
 </style>
+{% if ads_enabled %}
+<script src="//libtl.com/sdk.js" data-zone="10391340" data-sdk="show_10391340"></script>
+{% endif %}
 </head>
 <body>
 
@@ -418,6 +421,7 @@ body{
 <script>
 // ── State ─────────────────────────────────────────────────────
 const BASE_URL = "{{ base_url }}";
+const ADS_ENABLED = {{ "true" if ads_enabled else "false" }};
 const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 const USER_ID  = {{ user_id }};
 const ADMIN_ID_VAL = {{ user_id if is_admin else 0 }};
@@ -590,9 +594,6 @@ function joinBatch(){
   btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M20 6L9 17l-5-5"/></svg> Opening…`;
 
-  // Show info message: lecture sent to bot
-  showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
-
   const link = activeBatch.link;
   
   try {
@@ -611,48 +612,16 @@ function joinBatch(){
     window.open(link, '_blank');
   }
 
-  setTimeout(()=>{ closePopup(); }, 800);
-}
-
-// ── Info Message (blue banner) ────────────────────────────────
-function showInfoMsg(msg){
-  let el = document.getElementById('info-msg');
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'info-msg';
-    el.style.cssText = `
-      position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);
-      z-index:99999;
-      background:linear-gradient(135deg,#1e3a5f,#1a2a4a);
-      border:1px solid rgba(96,165,250,.45);
-      color:#93c5fd;
-      padding:12px 20px;
-      border-radius:14px;
-      font-size:13px;
-      font-family:'DM Sans',sans-serif;
-      font-weight:500;
-      max-width:320px;
-      width:calc(100% - 40px);
-      text-align:center;
-      box-shadow:0 8px 32px rgba(0,0,0,.5);
-      transition:transform .4s cubic-bezier(.34,1.15,.64,1), opacity .4s ease;
-      opacity:0;
-      pointer-events:none;
-    `;
-    document.body.appendChild(el);
+  // Show ad after link opens
+  if(typeof show_10391340 === 'function'){
+    setTimeout(()=>{
+      try{
+        show_10391340('pop').catch(()=>{});
+      }catch(e){}
+    }, 800);
   }
-  el.textContent = msg;
-  // Animate in
-  requestAnimationFrame(()=>{
-    el.style.opacity = '1';
-    el.style.transform = 'translateX(-50%) translateY(0)';
-  });
-  // Animate out after 3s
-  clearTimeout(el._timer);
-  el._timer = setTimeout(()=>{
-    el.style.opacity = '0';
-    el.style.transform = 'translateX(-50%) translateY(-80px)';
-  }, 3000);
+
+  setTimeout(()=>{ closePopup(); }, 800);
 }
 
 // ── Admin: Render ─────────────────────────────────────────────
