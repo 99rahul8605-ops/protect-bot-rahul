@@ -40,6 +40,7 @@ channels_collection = db["channels"]
 
 # Add ad tracking collection
 ad_impressions_collection = db["ad_impressions"]
+courses_collection = db["courses"]
 
 def init_db():
     """Verifies the MongoDB connection."""
@@ -1452,21 +1453,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send free resources list button."""
+    """Send courses page button."""
     if await maintenance_check(update, context):
         return
     
-    # Create inline button with the given URL
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    courses_url = f"{base_url}/courses"
+    
     keyboard = [[InlineKeyboardButton(
-        "📚 Free Resources List",
-        url="https://telegra.ph/Free-Lecturess-02-27",
+        "📚 View All Courses & Batches",
+        url=courses_url,
         api_kwargs={'style': 'primary'}
     )]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "📚 *Free Resources*\n\n"
-        "Click the button below to access our collection of free lectures and study materials.",
+        "📚 *Free Resources & Courses*\n\n"
+        "Click the button below to browse all available courses and batches.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
@@ -1788,6 +1791,125 @@ async def get_group_link(token: str):
         return {"url": link_data.get("telegram_link") or link_data.get("group_link")}
     else:
         raise HTTPException(status_code=404, detail="Link not found")
+
+@app.get("/courses")
+async def courses_page(request: Request):
+    """Public courses listing page."""
+    courses = list(courses_collection.find({}, {"_id": 1, "name": 1, "batches": 1, "order": 1}).sort("order", 1))
+    # Convert ObjectId to string for template
+    for course in courses:
+        course["id"] = str(course["_id"])
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    return templates.TemplateResponse("courses.html", {
+        "request": request,
+        "courses": courses,
+        "base_url": base_url
+    })
+
+@app.get("/admin/courses")
+async def admin_courses_page(request: Request, admin_id: Optional[int] = None):
+    """Admin panel for managing courses. Pass ?admin_id=YOUR_ID to authenticate."""
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    courses = list(courses_collection.find({}).sort("order", 1))
+    for course in courses:
+        course["id"] = str(course["_id"])
+        course["_id"] = str(course["_id"])
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    return templates.TemplateResponse("admin_courses.html", {
+        "request": request,
+        "courses": courses,
+        "admin_id": admin_id,
+        "base_url": base_url
+    })
+
+@app.post("/admin/courses/add")
+async def add_course(request: Request):
+    """Add a new course."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_name = data.get("name", "").strip()
+    if not course_name:
+        raise HTTPException(status_code=400, detail="Course name required")
+    
+    count = courses_collection.count_documents({})
+    result = courses_collection.insert_one({
+        "name": course_name,
+        "batches": [],
+        "order": count,
+        "created_at": datetime.datetime.now()
+    })
+    return {"status": "ok", "id": str(result.inserted_id)}
+
+@app.post("/admin/courses/add_batch")
+async def add_batch(request: Request):
+    """Add a batch to a course."""
+    from bson import ObjectId
+    import base64 as b64
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_id = data.get("course_id")
+    batch_name = data.get("batch_name", "").strip()
+    batch_link = data.get("batch_link", "").strip()
+    batch_pic = data.get("batch_pic", "")  # base64 image or empty
+    
+    if not course_id or not batch_name or not batch_link:
+        raise HTTPException(status_code=400, detail="course_id, batch_name, batch_link required")
+    
+    batch = {
+        "id": str(ObjectId()),
+        "name": batch_name,
+        "link": batch_link,
+        "pic": batch_pic  # base64 string or ""
+    }
+    
+    courses_collection.update_one(
+        {"_id": ObjectId(course_id)},
+        {"$push": {"batches": batch}}
+    )
+    return {"status": "ok"}
+
+@app.post("/admin/courses/delete_course")
+async def delete_course(request: Request):
+    """Delete a course."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_id = data.get("course_id")
+    courses_collection.delete_one({"_id": ObjectId(course_id)})
+    return {"status": "ok"}
+
+@app.post("/admin/courses/delete_batch")
+async def delete_batch(request: Request):
+    """Delete a batch from a course."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_id = data.get("course_id")
+    batch_id = data.get("batch_id")
+    courses_collection.update_one(
+        {"_id": ObjectId(course_id)},
+        {"$pull": {"batches": {"id": batch_id}}}
+    )
+    return {"status": "ok"}
 
 @app.get("/ad_stats")
 async def get_ad_stats():
