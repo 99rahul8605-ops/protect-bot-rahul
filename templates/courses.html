@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Team Secret — Courses</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c5cfc;
+    --accent2: #e040fb;
+    --gold: #f5c842;
+    --text: #f0eeff;
+    --muted: #8a889a;
+    --radius: 18px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Ambient bg blobs */
+  body::before {
+    content:'';
+    position:fixed; top:-200px; left:-200px;
+    width:600px; height:600px;
+    background: radial-gradient(circle, rgba(124,92,252,0.12) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+  body::after {
+    content:'';
+    position:fixed; bottom:-150px; right:-150px;
+    width:500px; height:500px;
+    background: radial-gradient(circle, rgba(224,64,251,0.08) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+
+  .wrap { position:relative; z-index:1; max-width:720px; margin:0 auto; padding:0 16px 60px; }
+
+  /* Header */
+  header {
+    text-align:center;
+    padding: 48px 0 36px;
+  }
+  .brand-logo {
+    width:64px; height:64px;
+    border-radius:50%;
+    border:2px solid var(--accent);
+    box-shadow: 0 0 24px rgba(124,92,252,0.4);
+    object-fit:cover;
+    margin-bottom:16px;
+  }
+  .brand-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight:600;
+    letter-spacing:4px;
+    text-transform:uppercase;
+    color: var(--accent);
+    margin-bottom:10px;
+  }
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(26px,6vw,40px);
+    font-weight:800;
+    line-height:1.15;
+    background: linear-gradient(135deg, #f0eeff 0%, var(--accent2) 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+    margin-bottom:10px;
+  }
+  header p {
+    color: var(--muted);
+    font-size:15px;
+    max-width:360px;
+    margin:0 auto;
+  }
+
+  /* Empty state */
+  .empty {
+    text-align:center;
+    padding:80px 20px;
+    color: var(--muted);
+  }
+  .empty svg { opacity:.3; margin-bottom:16px; }
+  .empty p { font-size:16px; }
+
+  /* Course block */
+  .course-block {
+    margin-bottom: 36px;
+    animation: fadeUp 0.5s ease both;
+  }
+  .course-block:nth-child(1){ animation-delay:.05s }
+  .course-block:nth-child(2){ animation-delay:.1s }
+  .course-block:nth-child(3){ animation-delay:.15s }
+  .course-block:nth-child(4){ animation-delay:.2s }
+  .course-block:nth-child(5){ animation-delay:.25s }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(22px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .course-header {
+    display:flex; align-items:center; gap:12px;
+    margin-bottom:16px;
+  }
+  .course-dot {
+    width:8px; height:8px; border-radius:50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    flex-shrink:0;
+    box-shadow:0 0 8px rgba(124,92,252,0.6);
+  }
+  .course-name {
+    font-family: 'Syne', sans-serif;
+    font-size:18px;
+    font-weight:700;
+    color: var(--text);
+    flex:1;
+  }
+  .batch-count {
+    font-size:12px;
+    color: var(--muted);
+    background: rgba(255,255,255,0.05);
+    border:1px solid var(--border);
+    padding:3px 10px;
+    border-radius:20px;
+  }
+
+  /* Batch cards grid */
+  .batches-grid {
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap:14px;
+  }
+
+  .batch-card {
+    background: var(--card);
+    border:1px solid var(--border);
+    border-radius: var(--radius);
+    overflow:hidden;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    text-decoration:none;
+    display:block;
+    position:relative;
+  }
+  .batch-card:hover {
+    transform:translateY(-4px);
+    border-color: rgba(124,92,252,0.4);
+    box-shadow: 0 12px 36px rgba(124,92,252,0.15);
+  }
+  .batch-card:active { transform:translateY(-1px); }
+
+  .batch-img {
+    width:100%; aspect-ratio:16/9;
+    object-fit:cover;
+    display:block;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+  }
+  .batch-img-placeholder {
+    width:100%; aspect-ratio:16/9;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .batch-img-placeholder img {
+    width:56px; height:56px;
+    border-radius:50%;
+    opacity:.6;
+    object-fit:cover;
+  }
+  .batch-img-placeholder .default-icon {
+    width:48px; height:48px;
+    opacity:.25;
+  }
+
+  .batch-info {
+    padding:12px 14px 14px;
+  }
+  .batch-name {
+    font-family:'Syne', sans-serif;
+    font-size:14px;
+    font-weight:600;
+    color:var(--text);
+    line-height:1.3;
+    margin-bottom:10px;
+  }
+  .batch-join {
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px;
+    font-weight:500;
+    color:var(--accent);
+    letter-spacing:.5px;
+  }
+  .batch-join svg { width:12px; height:12px; flex-shrink:0; }
+
+  /* Divider */
+  .divider {
+    height:1px;
+    background:linear-gradient(90deg, transparent, var(--border), transparent);
+    margin:8px 0 28px;
+  }
+
+  /* Footer */
+  footer {
+    text-align:center;
+    padding-top:32px;
+    color: var(--muted);
+    font-size:13px;
+    border-top:1px solid var(--border);
+  }
+  footer span { color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <!-- Default Team Secret logo -->
+    <img class="brand-logo"
+         src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg"
+         alt="Team Secret"
+         onerror="this.style.display='none'"/>
+    <div class="brand-name">Team Secret</div>
+    <h1>Courses & Batches</h1>
+    <p>Browse all available courses and join your batch directly.</p>
+  </header>
+
+  {% if courses %}
+    {% for course in courses %}
+    <div class="course-block">
+      <div class="course-header">
+        <div class="course-dot"></div>
+        <div class="course-name">{{ course.name }}</div>
+        <div class="batch-count">{{ course.batches | length }} batch{% if course.batches | length != 1 %}es{% endif %}</div>
+      </div>
+
+      {% if course.batches %}
+      <div class="batches-grid">
+        {% for batch in course.batches %}
+        <a class="batch-card" href="{{ batch.link }}" target="_blank" rel="noopener">
+          {% if batch.pic %}
+            <img class="batch-img" src="{{ batch.pic }}" alt="{{ batch.name }}"
+                 onerror="this.parentElement.innerHTML='<div class=batch-img-placeholder><svg class=default-icon viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%237c5cfc\' stroke-width=\'1.5\'><circle cx=\'12\' cy=\'8\' r=\'4\'/><path d=\'M4 20c0-4 3.6-7 8-7s8 3 8 7\'/></svg></div>'"/>
+          {% else %}
+          <div class="batch-img-placeholder">
+            <svg class="default-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="24" cy="24" r="22" stroke="#7c5cfc" stroke-width="2"/>
+              <path d="M16 24l6 6 10-12" stroke="#e040fb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          {% endif %}
+          <div class="batch-info">
+            <div class="batch-name">{{ batch.name }}</div>
+            <div class="batch-join">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c.339 0 .675.019 1.003.057L11 7h4V3l-1.994 2.005A10.002 10.002 0 0 0 12 5C6.477 5 2 9.477 2 15h1c0-.344.016-.685.045-1.022L2.458 12z" fill="currentColor"/>
+              </svg>
+              Join Now
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="color:var(--muted); font-size:14px; padding:8px 0;">No batches added yet.</p>
+      {% endif %}
+
+      {% if not loop.last %}<div class="divider"></div>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="1.5">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+    <p>No courses available yet.<br/>Check back soon!</p>
+  </div>
+  {% endif %}
+
+  <footer>
+    Powered by <span>Team Secret</span> &bull; All rights reserved
+  </footer>
+</div>
+</body>
+</html>
