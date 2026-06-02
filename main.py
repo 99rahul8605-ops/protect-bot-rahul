@@ -82,20 +82,24 @@ async def maintenance_check(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if user_id and is_owner(user_id):
         return False  # Owner can always use the bot
     
-    # Block the user with maintenance message
-    msg = (
-        "🔧 *Bot Under Maintenance*\n\n"
-        "We are currently performing scheduled maintenance to improve your experience.\n\n"
-        "⏳ Please try again later.\n\n"
-        "For urgent queries: https://t.me/team\\_secret\\_cont\\_bot"
-    )
-    
-    if update.message:
-        await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
-    elif update.callback_query:
-        await update.callback_query.answer("🔧 Bot is under maintenance. Please try again later.", show_alert=True)
-    
-    return True  # Blocked
+    # Only reply in private chats — never spam groups
+    is_private = (
+        update.message and update.message.chat.type == "private"
+    ) or update.callback_query
+
+    if is_private:
+        msg = (
+            "🔧 *Bot Under Maintenance*\n\n"
+            "We are currently performing scheduled maintenance to improve your experience.\n\n"
+            "⏳ Please try again later.\n\n"
+            "For urgent queries: https://t.me/team\\_secret\\_cont\\_bot"
+        )
+        if update.message:
+            await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+        elif update.callback_query:
+            await update.callback_query.answer("🔧 Bot is under maintenance. Please try again later.", show_alert=True)
+
+    return True  # Block in all cases (just don't reply in groups)
 
 def reset_and_set_commands():
     """Reset and set premium-style bot commands."""
