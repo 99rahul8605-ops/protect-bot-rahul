@@ -1462,8 +1462,7 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     keyboard = [[InlineKeyboardButton(
         "📚 View All Courses & Batches",
-        url=courses_url,
-        api_kwargs={'style': 'primary'}
+        web_app=WebAppInfo(url=courses_url)
     )]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
