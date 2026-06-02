@@ -1462,7 +1462,8 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
-    courses_url = f"{base_url}/courses"
+    user_id = update.effective_user.id
+    courses_url = f"{base_url}/courses?user_id={user_id}"
     
     keyboard = [[InlineKeyboardButton(
         "📚 View All Courses & Batches",
@@ -1490,6 +1491,32 @@ async def store_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             upsert=True
         )
 
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Open admin panel as WebApp inside Telegram."""
+    if await maintenance_check(update, context):
+        return
+    user_id = update.effective_user.id
+    if not is_owner(user_id):
+        await update.message.reply_text(
+            "🔒 *Admin Access Required*\n\nThis command is for the owner only.",
+            parse_mode=ParseMode.MARKDOWN,
+            disable_web_page_preview=True
+        )
+        return
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    admin_url = f"{base_url}/admin/courses?admin_id={user_id}"
+    keyboard = [[InlineKeyboardButton(
+        "⚙️ Open Admin Panel",
+        web_app=WebAppInfo(url=admin_url)
+    )]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "⚙️ *Admin Panel*\n\nManage courses and batches.",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
+
 # Register handlers
 telegram_bot_app.add_handler(CommandHandler("start", start))
 telegram_bot_app.add_handler(CommandHandler("protect", protect_command))
@@ -1498,6 +1525,7 @@ telegram_bot_app.add_handler(CommandHandler("broadcast", broadcast_command))
 telegram_bot_app.add_handler(CommandHandler("stats", stats_command))
 telegram_bot_app.add_handler(CommandHandler("list", list_command))  # <-- new handler
 telegram_bot_app.add_handler(CommandHandler("help", help_command))
+telegram_bot_app.add_handler(CommandHandler("admin", admin_command))
 telegram_bot_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, store_message))
 
 # Add callback handler
@@ -1796,17 +1824,20 @@ async def get_group_link(token: str):
         raise HTTPException(status_code=404, detail="Link not found")
 
 @app.get("/courses")
-async def courses_page(request: Request):
+async def courses_page(request: Request, user_id: Optional[int] = None):
     """Public courses listing page."""
     courses = list(courses_collection.find({}, {"_id": 1, "name": 1, "batches": 1, "order": 1}).sort("order", 1))
-    # Convert ObjectId to string for template
     for course in courses:
         course["id"] = str(course["_id"])
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    is_admin = (user_id == owner_id) if user_id else False
     return templates.TemplateResponse("courses.html", {
         "request": request,
         "courses": courses,
-        "base_url": base_url
+        "base_url": base_url,
+        "user_id": user_id or 0,
+        "is_admin": is_admin
     })
 
 @app.get("/admin/courses")
