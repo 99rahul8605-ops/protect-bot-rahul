@@ -1507,13 +1507,8 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await context.bot.send_message(
             chat_id=user_id,
             text=(
-                f"🎓 *{batch_name}*
-
-"
-                f"Here is your batch link:
-{batch_link}
-
-"
+                f"🎓 *{batch_name}*\n\n"
+                f"Here is your batch link:\n{batch_link}\n\n"
                 f"Tap the link to join!"
             ),
             parse_mode=ParseMode.MARKDOWN,
