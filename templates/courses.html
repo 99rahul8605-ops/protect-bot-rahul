@@ -85,6 +85,23 @@
     margin:0 auto;
   }
 
+  /* Admin button */
+  .admin-btn {
+    display:inline-flex; align-items:center; gap:8px;
+    margin: 0 auto 32px;
+    background: rgba(245,200,66,0.1);
+    border: 1px solid rgba(245,200,66,0.3);
+    color: #f5c842;
+    font-family:'Syne',sans-serif;
+    font-size:13px; font-weight:700;
+    letter-spacing:1px;
+    padding:8px 20px; border-radius:24px;
+    text-decoration:none;
+    transition:.2s;
+  }
+  .admin-btn:hover { background:rgba(245,200,66,0.18); }
+  .admin-btn svg { width:14px; height:14px; }
+
   /* Empty state */
   .empty {
     text-align:center;
@@ -232,6 +249,17 @@
     <div class="brand-name">Team Secret</div>
     <h1>Courses & Batches</h1>
     <p>Browse all available courses and join your batch directly.</p>
+  {% if is_admin %}
+  <div style="margin-top:20px;">
+    <a class="admin-btn" href="{{ base_url }}/admin/courses?admin_id={{ user_id }}" target="_blank">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      Manage Courses
+    </a>
+  </div>
+  {% endif %}
   </header>
 
   {% if courses %}
