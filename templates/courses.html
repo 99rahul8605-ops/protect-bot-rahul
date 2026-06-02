@@ -447,8 +447,41 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ── Navigation ────────────────────────────────────────────────
+// ── Navigation Stack + Telegram BackButton ────────────────────
+const navStack = ['screen-courses'];
+
+function updateTgBackButton(){
+  if(!tg?.BackButton) return;
+  const popupOpen = document.getElementById('batch-popup').classList.contains('show');
+  if(navStack.length > 1 || popupOpen){
+    tg.BackButton.show();
+  } else {
+    tg.BackButton.hide();
+  }
+}
+
+if(tg?.BackButton){
+  tg.BackButton.onClick(() => {
+    const popupOpen = document.getElementById('batch-popup').classList.contains('show');
+    if(popupOpen){ closePopup(); updateTgBackButton(); return; }
+    if(navStack.length > 1){
+      navStack.pop();
+      const target = navStack[navStack.length - 1];
+      _showScreen(target);
+    }
+    updateTgBackButton();
+  });
+}
+
 function showScreen(id){
+  if(navStack[navStack.length - 1] !== id){
+    navStack.push(id);
+  }
+  _showScreen(id);
+  updateTgBackButton();
+}
+
+function _showScreen(id){
   document.querySelectorAll('.screen').forEach(s => {
     s.classList.remove('hidden','slide-left');
     if(s.id !== id) s.classList.add('hidden');
@@ -456,9 +489,13 @@ function showScreen(id){
 }
 
 function goBack(targetId){
+  while(navStack.length > 1 && navStack[navStack.length-1] !== targetId){
+    navStack.pop();
+  }
   const current = document.querySelector('.screen:not(.hidden)');
   if(current){ current.classList.add('slide-left'); }
-  setTimeout(()=>{ showScreen(targetId); }, 10);
+  setTimeout(()=>{ _showScreen(targetId); }, 10);
+  updateTgBackButton();
 }
 
 function goAdmin(){
@@ -570,11 +607,12 @@ function openBatchPopup(batchId){
     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Join Batch`;
 
   document.getElementById('batch-popup').classList.add('show');
-}
+  updateTgBackButton();
 
 function closePopup(){
   document.getElementById('batch-popup').classList.remove('show');
   activeBatch = null;
+  updateTgBackButton();
 }
 
 function closePopupOnBg(e){
@@ -589,6 +627,9 @@ function joinBatch(){
   btn.classList.add('sent');
   btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M20 6L9 17l-5-5"/></svg> Opening…`;
+
+  // Show info message to user
+  toast('🔗 Batch link sent to bot — check your messages!', 'success', 4000);
 
   const link = activeBatch.link;
   
@@ -766,10 +807,10 @@ async function deleteBatch(courseId, batchId){
 }
 
 // ── Toast ─────────────────────────────────────────────────────
-function toast(msg, type='success'){
+function toast(msg, type='success', duration=2500){
   const t=document.getElementById('toast');
   t.textContent=msg; t.className='show '+type;
-  setTimeout(()=>t.className='',2500);
+  setTimeout(()=>t.className='',duration);
 }
 
 // ── Utils ─────────────────────────────────────────────────────
