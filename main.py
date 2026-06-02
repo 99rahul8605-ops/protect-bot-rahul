@@ -60,6 +60,42 @@ def init_db():
         logger.error(f"❌ MongoDB error: {e}")
         raise
 
+def is_maintenance_mode() -> bool:
+    """Check if maintenance mode is enabled via environment variable."""
+    return os.environ.get("MAINTENANCE_MODE", "false").lower() == "true"
+
+def is_owner(user_id: int) -> bool:
+    """Check if the user is the bot owner/admin."""
+    admin_id = int(os.environ.get("ADMIN_ID", 0))
+    return user_id == admin_id
+
+async def maintenance_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Returns True if the update should be BLOCKED (maintenance mode active + not owner).
+    Returns False if the update should proceed normally.
+    """
+    if not is_maintenance_mode():
+        return False  # Not in maintenance, proceed normally
+    
+    user_id = update.effective_user.id if update.effective_user else None
+    if user_id and is_owner(user_id):
+        return False  # Owner can always use the bot
+    
+    # Block the user with maintenance message
+    msg = (
+        "🔧 *Bot Under Maintenance*\n\n"
+        "We are currently performing scheduled maintenance to improve your experience.\n\n"
+        "⏳ Please try again later.\n\n"
+        "For urgent queries: https://t.me/team\\_secret\\_cont\\_bot"
+    )
+    
+    if update.message:
+        await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    elif update.callback_query:
+        await update.callback_query.answer("🔧 Bot is under maintenance. Please try again later.", show_alert=True)
+    
+    return True  # Blocked
+
 def reset_and_set_commands():
     """Reset and set premium-style bot commands."""
     try:
@@ -774,6 +810,9 @@ telegram_bot_app = Application.builder().token(os.environ.get("TELEGRAM_TOKEN"))
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command."""
+    if await maintenance_check(update, context):
+        return
+    
     user_id = update.effective_user.id
     
     # Store user (fast, no heavy ops)
@@ -883,6 +922,9 @@ I help you keep your channel links safe & secure.
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle button callbacks."""
+    if await maintenance_check(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     
@@ -917,6 +959,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Create protected link for ANY Telegram link (group or channel)."""
+    if await maintenance_check(update, context):
+        return
+    
     # No membership check required anymore
     
     if not context.args or not context.args[0].startswith("https://t.me/"):
@@ -1013,6 +1058,9 @@ async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def revoke_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Revoke a link."""
+    if await maintenance_check(update, context):
+        return
+    
     # No membership check required anymore
     
     if not context.args:
@@ -1325,6 +1373,9 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show help."""
+    if await maintenance_check(update, context):
+        return
+    
     user_id = update.effective_user.id
     
     # No membership check required anymore
@@ -1402,6 +1453,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send free resources list button."""
+    if await maintenance_check(update, context):
+        return
+    
     # Create inline button with the given URL
     keyboard = [[InlineKeyboardButton(
         "📚 Free Resources List",
@@ -1420,6 +1474,9 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def store_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Store user activity."""
+    if await maintenance_check(update, context):
+        return
+    
     if update.message and update.message.chat.type == "private":
         users_collection.update_one(
             {"user_id": update.effective_user.id},
