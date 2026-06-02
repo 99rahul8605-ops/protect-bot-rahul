@@ -40,6 +40,7 @@ channels_collection = db["channels"]
 
 # Add ad tracking collection
 ad_impressions_collection = db["ad_impressions"]
+courses_collection = db["courses"]
 
 def init_db():
     """Verifies the MongoDB connection."""
@@ -59,6 +60,46 @@ def init_db():
     except Exception as e:
         logger.error(f"❌ MongoDB error: {e}")
         raise
+
+def is_maintenance_mode() -> bool:
+    """Check if maintenance mode is enabled via environment variable."""
+    return os.environ.get("MAINTENANCE_MODE", "false").lower() == "true"
+
+def is_owner(user_id: int) -> bool:
+    """Check if the user is the bot owner/admin."""
+    admin_id = int(os.environ.get("ADMIN_ID", 0))
+    return user_id == admin_id
+
+async def maintenance_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Returns True if the update should be BLOCKED (maintenance mode active + not owner).
+    Returns False if the update should proceed normally.
+    """
+    if not is_maintenance_mode():
+        return False  # Not in maintenance, proceed normally
+    
+    user_id = update.effective_user.id if update.effective_user else None
+    if user_id and is_owner(user_id):
+        return False  # Owner can always use the bot
+    
+    # Only reply in private chats — never spam groups
+    is_private = (
+        update.message and update.message.chat.type == "private"
+    ) or update.callback_query
+
+    if is_private:
+        msg = (
+            "🔧 *Bot Under Maintenance*\n\n"
+            "We are currently performing scheduled maintenance to improve your experience.\n\n"
+            "⏳ Please try again later.\n\n"
+            "For urgent queries: https://t.me/team\\_secret\\_cont\\_bot"
+        )
+        if update.message:
+            await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+        elif update.callback_query:
+            await update.callback_query.answer("🔧 Bot is under maintenance. Please try again later.", show_alert=True)
+
+    return True  # Block in all cases (just don't reply in groups)
 
 def reset_and_set_commands():
     """Reset and set premium-style bot commands."""
@@ -774,6 +815,9 @@ telegram_bot_app = Application.builder().token(os.environ.get("TELEGRAM_TOKEN"))
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command."""
+    if await maintenance_check(update, context):
+        return
+    
     user_id = update.effective_user.id
     
     # Store user (fast, no heavy ops)
@@ -883,6 +927,9 @@ I help you keep your channel links safe & secure.
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle button callbacks."""
+    if await maintenance_check(update, context):
+        return
+    
     query = update.callback_query
     await query.answer()
     
@@ -917,6 +964,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Create protected link for ANY Telegram link (group or channel)."""
+    if await maintenance_check(update, context):
+        return
+    
     # No membership check required anymore
     
     if not context.args or not context.args[0].startswith("https://t.me/"):
@@ -1013,6 +1063,9 @@ async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def revoke_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Revoke a link."""
+    if await maintenance_check(update, context):
+        return
+    
     # No membership check required anymore
     
     if not context.args:
@@ -1325,6 +1378,9 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show help."""
+    if await maintenance_check(update, context):
+        return
+    
     user_id = update.effective_user.id
     
     # No membership check required anymore
@@ -1401,18 +1457,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send free resources list button."""
-    # Create inline button with the given URL
+    """Send courses page button."""
+    if await maintenance_check(update, context):
+        return
+    
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    user_id = update.effective_user.id
+    courses_url = f"{base_url}/courses?user_id={user_id}"
+    
     keyboard = [[InlineKeyboardButton(
-        "📚 Free Resources List",
-        url="https://telegra.ph/Free-Lecturess-02-27",
-        api_kwargs={'style': 'primary'}
+        "📚 View All Courses & Batches",
+        web_app=WebAppInfo(url=courses_url)
     )]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "📚 *Free Resources*\n\n"
-        "Click the button below to access our collection of free lectures and study materials.",
+        "📚 *Free Resources & Courses*\n\n"
+        "Click the button below to browse all available courses and batches.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
@@ -1420,12 +1481,70 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def store_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Store user activity."""
+    if await maintenance_check(update, context):
+        return
+    
     if update.message and update.message.chat.type == "private":
         users_collection.update_one(
             {"user_id": update.effective_user.id},
             {"$set": {"last_active": update.message.date}},
             upsert=True
         )
+
+async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle data sent from WebApp (join batch action)."""
+    import json as _json
+    data_str = update.effective_message.web_app_data.data
+    try:
+        data = _json.loads(data_str)
+    except Exception:
+        return
+
+    if data.get("action") == "join":
+        batch_link = data.get("batch_link", "")
+        batch_name = data.get("batch_name", "Batch")
+        user_id = update.effective_user.id
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=(
+                f"🎓 *{batch_name}*
+
+"
+                f"Here is your batch link:
+{batch_link}
+
+"
+                f"Tap the link to join!"
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+            disable_web_page_preview=False
+        )
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Open admin panel as WebApp inside Telegram."""
+    if await maintenance_check(update, context):
+        return
+    user_id = update.effective_user.id
+    if not is_owner(user_id):
+        await update.message.reply_text(
+            "🔒 *Admin Access Required*\n\nThis command is for the owner only.",
+            parse_mode=ParseMode.MARKDOWN,
+            disable_web_page_preview=True
+        )
+        return
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    admin_url = f"{base_url}/courses?user_id={user_id}"
+    keyboard = [[InlineKeyboardButton(
+        "⚙️ Open Admin Panel",
+        web_app=WebAppInfo(url=admin_url)
+    )]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "⚙️ *Admin Panel*\n\nManage courses and batches.",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
 
 # Register handlers
 telegram_bot_app.add_handler(CommandHandler("start", start))
@@ -1435,6 +1554,8 @@ telegram_bot_app.add_handler(CommandHandler("broadcast", broadcast_command))
 telegram_bot_app.add_handler(CommandHandler("stats", stats_command))
 telegram_bot_app.add_handler(CommandHandler("list", list_command))  # <-- new handler
 telegram_bot_app.add_handler(CommandHandler("help", help_command))
+telegram_bot_app.add_handler(CommandHandler("admin", admin_command))
+telegram_bot_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
 telegram_bot_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, store_message))
 
 # Add callback handler
@@ -1731,6 +1852,137 @@ async def get_group_link(token: str):
         return {"url": link_data.get("telegram_link") or link_data.get("group_link")}
     else:
         raise HTTPException(status_code=404, detail="Link not found")
+
+@app.get("/api/courses")
+async def api_courses():
+    """JSON API for courses data."""
+    courses = list(courses_collection.find({}, {"_id": 1, "name": 1, "batches": 1, "order": 1}).sort("order", 1))
+    for course in courses:
+        course["id"] = str(course["_id"])
+        del course["_id"]
+    return courses
+
+@app.get("/courses")
+async def courses_page(request: Request, user_id: Optional[int] = None):
+    """Public courses listing page."""
+    courses = list(courses_collection.find({}, {"_id": 1, "name": 1, "batches": 1, "order": 1}).sort("order", 1))
+    for course in courses:
+        course["id"] = str(course["_id"])
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    is_admin = (user_id == owner_id) if user_id else False
+    return templates.TemplateResponse("courses.html", {
+        "request": request,
+        "courses": courses,
+        "base_url": base_url,
+        "user_id": user_id or 0,
+        "is_admin": is_admin
+    })
+
+@app.get("/admin/courses")
+async def admin_courses_page(request: Request, admin_id: Optional[int] = None):
+    """Admin panel for managing courses. Pass ?admin_id=YOUR_ID to authenticate."""
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    courses = list(courses_collection.find({}).sort("order", 1))
+    for course in courses:
+        course["id"] = str(course["_id"])
+        course["_id"] = str(course["_id"])
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    return templates.TemplateResponse("admin_courses.html", {
+        "request": request,
+        "courses": courses,
+        "admin_id": admin_id,
+        "base_url": base_url
+    })
+
+@app.post("/admin/courses/add")
+async def add_course(request: Request):
+    """Add a new course."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_name = data.get("name", "").strip()
+    if not course_name:
+        raise HTTPException(status_code=400, detail="Course name required")
+    
+    count = courses_collection.count_documents({})
+    result = courses_collection.insert_one({
+        "name": course_name,
+        "batches": [],
+        "order": count,
+        "created_at": datetime.datetime.now()
+    })
+    return {"status": "ok", "id": str(result.inserted_id)}
+
+@app.post("/admin/courses/add_batch")
+async def add_batch(request: Request):
+    """Add a batch to a course."""
+    from bson import ObjectId
+    import base64 as b64
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_id = data.get("course_id")
+    batch_name = data.get("batch_name", "").strip()
+    batch_link = data.get("batch_link", "").strip()
+    batch_pic = data.get("batch_pic", "")  # base64 image or empty
+    
+    if not course_id or not batch_name or not batch_link:
+        raise HTTPException(status_code=400, detail="course_id, batch_name, batch_link required")
+    
+    batch = {
+        "id": str(ObjectId()),
+        "name": batch_name,
+        "link": batch_link,
+        "pic": batch_pic  # base64 string or ""
+    }
+    
+    courses_collection.update_one(
+        {"_id": ObjectId(course_id)},
+        {"$push": {"batches": batch}}
+    )
+    return {"status": "ok"}
+
+@app.post("/admin/courses/delete_course")
+async def delete_course(request: Request):
+    """Delete a course."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_id = data.get("course_id")
+    courses_collection.delete_one({"_id": ObjectId(course_id)})
+    return {"status": "ok"}
+
+@app.post("/admin/courses/delete_batch")
+async def delete_batch(request: Request):
+    """Delete a batch from a course."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    course_id = data.get("course_id")
+    batch_id = data.get("batch_id")
+    courses_collection.update_one(
+        {"_id": ObjectId(course_id)},
+        {"$pull": {"batches": {"id": batch_id}}}
+    )
+    return {"status": "ok"}
 
 @app.get("/ad_stats")
 async def get_ad_stats():
