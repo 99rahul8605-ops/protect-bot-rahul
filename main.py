@@ -1546,24 +1546,13 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
     courses_url = f"{base_url}/courses"
-    chat_type = update.effective_chat.type
 
-    if chat_type == "private":
-        # Private chat - direct WebApp button
-        keyboard = [[InlineKeyboardButton(
-            "📚 View All Courses & Batches",
-            web_app=WebAppInfo(url=courses_url),
-            api_kwargs={"style": "success"}
-        )]]
-    else:
-        # Group - use t.me/botname?startapp= to open as mini app inside Telegram
-        bot_info = await context.bot.get_me()
-        miniapp_url = f"https://t.me/{bot_info.username}?startapp=courses"
-        keyboard = [[InlineKeyboardButton(
-            "📚 View All Courses & Batches",
-            url=miniapp_url,
-            api_kwargs={"style": "success"}
-        )]]
+    # web_app=WebAppInfo works in both private and group chats
+    keyboard = [[InlineKeyboardButton(
+        "📚 View All Courses & Batches",
+        web_app=WebAppInfo(url=courses_url),
+        api_kwargs={"style": "success"}
+    )]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
