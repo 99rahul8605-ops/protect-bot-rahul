@@ -684,28 +684,9 @@ function joinBatch(){
   // Show info message
   showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
 
-  if (isAdSDKAvailable()) {
-    // Ad pehle - user ke direct click gesture pe
-    show_10391340('pop').then(() => {
-      // Ad dekh liya - link kholo
-      openBatchLink(link);
-      setTimeout(()=>{ closePopup(); }, 500);
-    }).catch(e => {
-      // Ad nahi aaya - phir bhi link kholo
-      openBatchLink(link);
-      setTimeout(()=>{ closePopup(); }, 500);
-    });
-
-    // Safety: 12 sec mein bhi link nahi khula to force open
-    setTimeout(() => {
-      openBatchLink(link);
-      closePopup();
-    }, 12000);
-
-  } else {
-    openBatchLink(link);
-    setTimeout(()=>{ closePopup(); }, 800);
-  }
+  // Seedha link open karo - ad sirf Generate Link pe hoga
+  openBatchLink(link);
+  setTimeout(()=>{ closePopup(); }, 800);
 }
 
 // ── Info Message ──────────────────────────────────────────────
