@@ -420,7 +420,11 @@ body{
 <script>
 // ── State ─────────────────────────────────────────────────────
 const BASE_URL = "{{ base_url }}";
-const ADS_ENABLED = {{ "true" if ads_enabled else "false" }};
+const adsEnabled = {{ ads_enabled|tojson }};
+
+function isAdSDKAvailable() {
+    return adsEnabled && typeof show_10391340 === "function";
+}
 const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 const USER_ID  = {{ user_id }};
 const ADMIN_ID_VAL = {{ user_id if is_admin else 0 }};
@@ -614,11 +618,25 @@ function joinBatch(){
   // Show info message
   showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
 
-  // Show ad after link opens
-  if(typeof show_10391340 === 'function'){
-    setTimeout(()=>{
-      try{ show_10391340('pop').catch(()=>{}); }catch(e){}
-    }, 800);
+  // Show ad - exact same as verify.html
+  if (isAdSDKAvailable()) {
+    let adCompleted = false;
+    const adTimeout = setTimeout(() => {
+      if (!adCompleted) {
+        adCompleted = true;
+      }
+    }, 10000);
+    try {
+      show_10391340('pop').then(() => {
+        clearTimeout(adTimeout);
+        adCompleted = true;
+      }).catch(error => {
+        clearTimeout(adTimeout);
+        adCompleted = true;
+      });
+    } catch(adError) {
+      clearTimeout(adTimeout);
+    }
   }
 
   setTimeout(()=>{ closePopup(); }, 800);
