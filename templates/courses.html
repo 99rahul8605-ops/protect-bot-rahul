@@ -823,7 +823,7 @@ function renderAdminCourses(){
                 <div class="bname">${escHtml(b.name)}</div>
                 <div class="blink">${escHtml(b.link)}</div>
               </div>
-              <button class="edit-btn" style="margin-right:4px;" onclick="editBatch('${c.id}','${b.id}','${escHtml(b.name)}','${escHtml(b.link)}')">
+              <button class="edit-btn" style="margin-right:4px;" onclick="editBatch('${c.id}','${b.id}','${escHtml(b.name)}','${escHtml(b.link)}',${b.pic ? "'hasPic'" : "''"})">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
               <button class="del-btn" onclick="deleteBatch('${c.id}','${b.id}')">
@@ -963,15 +963,63 @@ function editCourse(courseId, name){
   setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
 }
 
-function editBatch(courseId, batchId, name, link){
-  editState = { type:'batch', courseId, batchId };
+function editBatch(courseId, batchId, name, link, hasPic){
+  editState = { type:'batch', courseId, batchId, deletePic: false };
   document.getElementById('edit-modal-title').textContent = 'Edit Batch';
   document.getElementById('edit-modal-body').innerHTML = `
-    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Batch name" autocomplete="off"/>
-    <input class="inp" id="edit-inp-link" type="text" value="${link}" placeholder="https://t.me/..." autocomplete="off"/>
+    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Batch name" autocomplete="off" style="margin-bottom:10px;"/>
+    <input class="inp" id="edit-inp-link" type="text" value="${link}" placeholder="https://t.me/..." autocomplete="off" style="margin-bottom:12px;"/>
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Batch Picture</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <label class="file-label" for="edit-bp" style="flex:1;min-width:120px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+        </svg>
+        <span id="edit-fpl">${hasPic ? 'Change Pic' : 'Add Pic (optional)'}</span>
+        <input type="file" id="edit-bp" accept="image/*" onchange="editPreviewPic(this)"/>
+      </label>
+      <img class="pic-preview" id="edit-pp" src="" alt="" style="${hasPic ? 'display:block' : 'display:none'}"/>
+      ${hasPic ? `<button type="button" onclick="editDeletePic()" id="edit-del-pic-btn"
+        style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--red);
+               border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;">
+        🗑 Remove Pic
+      </button>` : ''}
+    </div>
+    <div id="edit-pic-status" style="font-size:11px;color:var(--muted);margin-top:6px;display:none;">Pic will be removed on save.</div>
   `;
   document.getElementById('edit-modal-overlay').classList.add('show');
   setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
+}
+
+function editPreviewPic(input){
+  const file = input.files[0];
+  const preview = document.getElementById('edit-pp');
+  const label   = document.getElementById('edit-fpl');
+  if(!file){ preview.style.display='none'; return; }
+  if(file.size > 1048576){ toast('Max 1MB','error'); input.value=''; return; }
+  label.textContent = file.name.length>16 ? file.name.slice(0,16)+'…' : file.name;
+  const r = new FileReader();
+  r.onload = e => { preview.src=e.target.result; preview.style.display='block'; };
+  r.readAsDataURL(file);
+  // If user picks new pic, cancel any pending delete
+  editState.deletePic = false;
+  const statusEl = document.getElementById('edit-pic-status');
+  if(statusEl) statusEl.style.display = 'none';
+}
+
+function editDeletePic(){
+  editState.deletePic = true;
+  const preview = document.getElementById('edit-pp');
+  const fileInput = document.getElementById('edit-bp');
+  const label = document.getElementById('edit-fpl');
+  const btn = document.getElementById('edit-del-pic-btn');
+  const statusEl = document.getElementById('edit-pic-status');
+  if(preview) { preview.style.display='none'; preview.src=''; }
+  if(fileInput) fileInput.value = '';
+  if(label) label.textContent = 'Add Pic (optional)';
+  if(btn) { btn.style.opacity='0.4'; btn.disabled=true; }
+  if(statusEl) statusEl.style.display = 'block';
 }
 
 function closeEditModal(e){
@@ -1000,10 +1048,24 @@ async function saveEdit(){
     const link = document.getElementById('edit-inp-link').value.trim();
     if(!name) return toast('Enter batch name','error');
     if(!link||!link.startsWith('https://t.me/')) return toast('Enter valid t.me link','error');
+
+    // Pic: new upload, delete, or unchanged
+    let batch_pic = undefined; // undefined = no change
+    const fileInput = document.getElementById('edit-bp');
+    if(fileInput && fileInput.files[0]){
+      batch_pic = await new Promise(res=>{
+        const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(fileInput.files[0]);
+      });
+    } else if(editState.deletePic){
+      batch_pic = ''; // empty string = delete pic
+    }
+
     try {
+      const payload = {admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link};
+      if(batch_pic !== undefined) payload.batch_pic = batch_pic;
       const res = await fetch(BASE_URL+'/admin/courses/edit_batch',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link})
+        body: JSON.stringify(payload)
       });
       if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
       toast('Batch updated!','success');
