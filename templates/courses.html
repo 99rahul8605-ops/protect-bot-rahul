@@ -628,9 +628,18 @@ function generateLink(){
   genBtn.disabled = true;
   genBtn.style.opacity = '0.5';
 
-  // Show ad on user gesture
+  // Show inApp interstitial ad (page ke andar - new tab nahi kholega)
   if (isAdSDKAvailable()) {
-    show_10391340('pop').catch(e => {});
+    show_10391340({
+      type: 'inApp',
+      inAppSettings: {
+        frequency: 1,
+        capping: 0.1,
+        interval: 30,
+        timeout: 0,
+        everyPage: false
+      }
+    });
   }
 
   // Show countdown
