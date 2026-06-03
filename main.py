@@ -956,7 +956,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await handle_broadcast_confirmation(update, context)
     
     elif query.data == "cancel_broadcast":
-        await query.message.edit_text("❌ Broadcast cancelled", disable_web_page_preview=True)
+        # If broadcast is running, set cancel flag; else just cancel confirmation
+        if context.user_data.get("broadcast_cancelled") is False:
+            context.user_data["broadcast_cancelled"] = True
+            await query.answer("⛔ Stopping broadcast...", show_alert=False)
+        else:
+            await query.message.edit_text("❌ *Broadcast Cancelled*", parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
     
     elif query.data.startswith("revoke_"):
         link_id = query.data.replace("revoke_", "")
@@ -1206,113 +1211,216 @@ async def handle_revoke_link(update: Update, context: ContextTypes.DEFAULT_TYPE,
     )
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin broadcast."""
+    """Admin broadcast. Flags: --p (pin), --f (forward)"""
     admin_id = int(os.environ.get("ADMIN_ID", 0))
     if update.effective_user.id != admin_id:
         await update.message.reply_text(
-            "🔒 *Admin Access Required*\n\n"
-            "This command is restricted to administrators only.\n\n"
-            "*Contact:* https://t.me/team\\_secret\\_cont\\_bot",
+            "🔒 *Admin Access Required*
+
+"
+            "This command is restricted to administrators only.
+
+"
+            "*Contact:* https://t.me/team\_secret\_cont\_bot",
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True
         )
         return
-    
+
+    args = context.args or []
+    pin_msg     = "--p" in args
+    forward_msg = "--f" in args
+
     if not update.message.reply_to_message:
         await update.message.reply_text(
-            "📢 *Broadcast System*\n\n"
-            "To broadcast a message:\n"
-            "1. Send any message\n"
-            "2. Reply to it with `/broadcast`\n"
-            "3. Confirm the action\n\n"
-            "✨ *Features:*\n"
-            "• Supports all media types\n"
-            "• Preserves formatting\n"
-            "• Tracks delivery\n"
-            "• No rate limiting\n\n"
-            "*Contact:* https://t.me/team\\_secret\\_cont\\_bot",
+            "📢 *Broadcast System*
+
+"
+            "To broadcast a message:
+"
+            "1. Send any message
+"
+            "2. Reply to it with `/broadcast`
+"
+            "3. Confirm the action
+
+"
+            "✨ *Flags:*
+"
+            "• `/broadcast --p` → Pin message after sending
+"
+            "• `/broadcast --f` → Forward instead of copy
+"
+            "• `/broadcast --p --f` → Forward + Pin
+
+"
+            "✨ *Features:*
+"
+            "• Supports all media types
+"
+            "• Preserves formatting
+"
+            "• Tracks delivery
+"
+            "• No rate limiting
+
+"
+            "*Contact:* https://t.me/team\_secret\_cont\_bot",
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True
         )
         return
-    
+
     total_users = users_collection.count_documents({})
+
+    mode_parts = []
+    if forward_msg: mode_parts.append("Forward 📨")
+    else: mode_parts.append("Copy 📋")
+    if pin_msg: mode_parts.append("Pin 📌")
+    mode_label = " + ".join(mode_parts)
+
     keyboard = [
-        [
-            InlineKeyboardButton(
-                "✅ Confirm Broadcast",
-                callback_data="confirm_broadcast",
-                api_kwargs={'style': 'success'}  # green
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "❌ Cancel",
-                callback_data="cancel_broadcast",
-                api_kwargs={'style': 'danger'}  # red
-            )
-        ]
+        [InlineKeyboardButton(
+            "✅ Confirm Broadcast",
+            callback_data="confirm_broadcast",
+            api_kwargs={"style": "success"}
+        )],
+        [InlineKeyboardButton(
+            "❌ Cancel",
+            callback_data="cancel_broadcast",
+            api_kwargs={"style": "danger"}
+        )]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Safely get content_type with default fallback
-    content_type = getattr(update.message.reply_to_message, 'content_type', 'text')
-    
+
+    content_type = getattr(update.message.reply_to_message, "content_type", "text")
+
     await update.message.reply_text(
-        f"⚠️ *Broadcast Confirmation*\n\n"
-        f"📊 *Delivery Stats:*\n"
-        f"• 📨 Recipients: `{total_users}` users\n"
-        f"• 📝 Type: {content_type}\n"
-        f"• ⚡ Delivery: Instant\n\n"
+        f"⚠️ *Broadcast Confirmation*
+
+"
+        f"📊 *Delivery Stats:*
+"
+        f"• 📨 Recipients: `{total_users}` users
+"
+        f"• 📝 Type: {content_type}
+"
+        f"• ⚙️ Mode: {mode_label}
+"
+        f"• ⚡ Delivery: Instant
+
+"
         f"Are you sure you want to proceed?",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
     )
-    
-    context.user_data['broadcast_message'] = update.message.reply_to_message
+
+    context.user_data["broadcast_message"] = update.message.reply_to_message
+    context.user_data["broadcast_pin"]     = pin_msg
+    context.user_data["broadcast_forward"] = forward_msg
 
 async def handle_broadcast_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast confirmation."""
     query = update.callback_query
     await query.answer()
-    
-    await query.message.edit_text("📤 *Broadcasting...*\n\nPlease wait, this may take a moment.", parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
-    
+
+    pin_msg     = context.user_data.get("broadcast_pin", False)
+    forward_msg = context.user_data.get("broadcast_forward", False)
+    message_to_broadcast = context.user_data.get("broadcast_message")
+
+    context.user_data["broadcast_cancelled"] = False
+
+    cancel_keyboard = [[InlineKeyboardButton(
+        "⛔ Stop Broadcast",
+        callback_data="cancel_broadcast",
+        api_kwargs={"style": "danger"}
+    )]]
+    await query.message.edit_text(
+        "📤 *Broadcasting...*
+
+Please wait, this may take a moment.",
+        reply_markup=InlineKeyboardMarkup(cancel_keyboard),
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
+
     users = list(users_collection.find({}))
     total_users = len(users)
     successful = 0
     failed = 0
-    
-    message_to_broadcast = context.user_data.get('broadcast_message')
-    
+    pinned = 0
+
     for user in users:
+        if context.user_data.get("broadcast_cancelled", False):
+            break
         try:
-            await message_to_broadcast.copy(chat_id=user['user_id'])
+            if forward_msg:
+                sent = await context.bot.forward_message(
+                    chat_id=user["user_id"],
+                    from_chat_id=message_to_broadcast.chat_id,
+                    message_id=message_to_broadcast.message_id
+                )
+            else:
+                sent = await message_to_broadcast.copy(chat_id=user["user_id"])
+
+            if pin_msg:
+                try:
+                    await context.bot.pin_chat_message(
+                        chat_id=user["user_id"],
+                        message_id=sent.message_id,
+                        disable_notification=True
+                    )
+                    pinned += 1
+                except Exception:
+                    pass
+
             successful += 1
             await asyncio.sleep(0.05)
         except Exception as e:
             logger.error(f"Failed: {user['user_id']}: {e}")
             failed += 1
-    
+
+    was_cancelled = context.user_data.get("broadcast_cancelled", False)
+
     broadcast_collection.insert_one({
         "admin_id": query.from_user.id,
         "date": datetime.datetime.now(),
         "total_users": total_users,
         "successful": successful,
-        "failed": failed
+        "failed": failed,
+        "pinned": pinned,
+        "forwarded": forward_msg,
+        "cancelled": was_cancelled
     })
-    
+
     success_rate = (successful / total_users * 100) if total_users > 0 else 0
-    
+    status   = "⛔ *Broadcast Stopped!*" if was_cancelled else "✅ *Broadcast Complete!*"
+    pin_line  = f"• 📌 Pinned: `{pinned}`
+" if pin_msg else ""
+    mode_line = "• 📨 Mode: Forward
+" if forward_msg else "• 📋 Mode: Copy
+"
+
     await query.message.edit_text(
-        f"✅ *Broadcast Complete!*\n\n"
-        f"📊 *Delivery Report:*\n"
-        f"• 📨 Total Recipients: `{total_users}`\n"
-        f"• ✅ Successful: `{successful}`\n"
-        f"• ❌ Failed: `{failed}`\n"
-        f"• 📈 Success Rate: `{success_rate:.1f}%`\n"
-        f"• ⏰ Time: {datetime.datetime.now().strftime('%H:%M:%S')}\n\n"
+        f"{status}
+
+"
+        f"📊 *Delivery Report:*
+"
+        f"• 📨 Total Recipients: `{total_users}`
+"
+        f"• ✅ Successful: `{successful}`
+"
+        f"• ❌ Failed: `{failed}`
+"
+        f"{pin_line}"
+        f"{mode_line}"
+        f"• 📈 Success Rate: `{success_rate:.1f}%`
+"
+        f"• ⏰ Time: {datetime.datetime.now().strftime('%H:%M:%S')}
+
+"
         f"✨ Broadcast logged in system.",
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
@@ -1465,15 +1573,29 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user_id = update.effective_user.id
     courses_url = f"{base_url}/courses?user_id={user_id}"
     
-    keyboard = [[InlineKeyboardButton(
-        "📚 View All Courses & Batches",
-        web_app=WebAppInfo(url=courses_url),
-        api_kwargs={'style': 'success'}
-    )]]
+    chat_type = update.effective_chat.type  # private, group, supergroup, channel
+    
+    if chat_type == "private":
+        # WebApp button only works in private chat
+        keyboard = [[InlineKeyboardButton(
+            "📚 View All Courses & Batches",
+            web_app=WebAppInfo(url=courses_url),
+            api_kwargs={'style': 'success'}
+        )]]
+    else:
+        # Groups/supergroups: use url button
+        keyboard = [[InlineKeyboardButton(
+            "📚 View All Courses & Batches",
+            url=courses_url,
+            api_kwargs={'style': 'success'}
+        )]]
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "📚 *Free Resources & Courses*\n\n"
+        "📚 *Free Resources & Courses*
+
+"
         "Click the button below to browse all available courses and batches.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
@@ -1977,64 +2099,6 @@ async def delete_batch(request: Request):
     courses_collection.update_one(
         {"_id": ObjectId(course_id)},
         {"$pull": {"batches": {"id": batch_id}}}
-    )
-    return {"status": "ok"}
-
-@app.post("/admin/courses/edit_course")
-async def edit_course(request: Request):
-    """Edit a course name."""
-    from bson import ObjectId
-    data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
-
-    course_id = data.get("course_id")
-    name = data.get("name", "").strip()
-    if not course_id or not name:
-        raise HTTPException(status_code=400, detail="course_id and name required")
-
-    courses_collection.update_one(
-        {"_id": ObjectId(course_id)},
-        {"$set": {"name": name}}
-    )
-    return {"status": "ok"}
-
-@app.post("/admin/courses/edit_batch")
-async def edit_batch(request: Request):
-    """Edit a batch (name, link, and optionally pic)."""
-    from bson import ObjectId
-    data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
-
-    course_id   = data.get("course_id")
-    batch_id    = data.get("batch_id")
-    batch_name  = data.get("batch_name", "").strip()
-    batch_link  = data.get("batch_link", "").strip()
-
-    if not course_id or not batch_id or not batch_name or not batch_link:
-        raise HTTPException(status_code=400, detail="course_id, batch_id, batch_name, batch_link required")
-
-    # Build update fields
-    update_fields = {
-        "batches.$.name": batch_name,
-        "batches.$.link": batch_link,
-    }
-
-    # batch_pic key present hone ka matlab:
-    #   "" (empty string) = pic delete karo
-    #   base64 string     = naya pic set karo
-    #   key absent        = pic unchanged rakho
-    if "batch_pic" in data:
-        update_fields["batches.$.pic"] = data["batch_pic"]  # "" or base64
-
-    courses_collection.update_one(
-        {"_id": ObjectId(course_id), "batches.id": batch_id},
-        {"$set": update_fields}
     )
     return {"status": "ok"}
 
