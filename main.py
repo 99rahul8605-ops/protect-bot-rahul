@@ -2110,6 +2110,54 @@ async def delete_batch(request: Request):
     )
     return {"status": "ok"}
 
+@app.post("/admin/courses/edit_course")
+async def edit_course(request: Request):
+    """Edit a course name."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    course_id = data.get("course_id")
+    name = data.get("name", "").strip()
+    if not course_id or not name:
+        raise HTTPException(status_code=400, detail="course_id and name required")
+
+    courses_collection.update_one(
+        {"_id": ObjectId(course_id)},
+        {"$set": {"name": name}}
+    )
+    return {"status": "ok"}
+
+@app.post("/admin/courses/edit_batch")
+async def edit_batch(request: Request):
+    """Edit a batch name and link inside a course."""
+    from bson import ObjectId
+    data = await request.json()
+    admin_id = int(data.get("admin_id", 0))
+    owner_id = int(os.environ.get("ADMIN_ID", 0))
+    if admin_id != owner_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    course_id = data.get("course_id")
+    batch_id  = data.get("batch_id")
+    batch_name = data.get("batch_name", "").strip()
+    batch_link = data.get("batch_link", "").strip()
+
+    if not course_id or not batch_id or not batch_name or not batch_link:
+        raise HTTPException(status_code=400, detail="course_id, batch_id, batch_name, batch_link required")
+
+    courses_collection.update_one(
+        {"_id": ObjectId(course_id), "batches.id": batch_id},
+        {"$set": {
+            "batches.$.name": batch_name,
+            "batches.$.link": batch_link
+        }}
+    )
+    return {"status": "ok"}
+
 @app.get("/ad_stats")
 async def get_ad_stats():
     """Get ad statistics (admin only)."""
