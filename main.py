@@ -846,8 +846,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 api_kwargs={"style": "success"}
             )]]
             await update.message.reply_text(
-                "👆 Tap to open",
-                reply_markup=InlineKeyboardMarkup(keyboard)
+                "📚 *Free Resources & Courses*
+
+"
+                "Click the button below to browse all available courses and batches.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN,
+                disable_web_page_preview=True
             )
             return
 
