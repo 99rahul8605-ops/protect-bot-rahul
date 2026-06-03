@@ -628,18 +628,22 @@ function generateLink(){
   genBtn.disabled = true;
   genBtn.style.opacity = '0.5';
 
-  // Show inApp interstitial ad (page ke andar - new tab nahi kholega)
+  // Random se koi bhi ek ad show karo
   if (isAdSDKAvailable()) {
-    show_10391340({
-      type: 'inApp',
-      inAppSettings: {
-        frequency: 1,
-        capping: 0.1,
-        interval: 30,
-        timeout: 0,
-        everyPage: false
-      }
-    });
+    const adType = Math.floor(Math.random() * 3);
+    if (adType === 0) {
+      // inApp Interstitial
+      show_10391340({
+        type: 'inApp',
+        inAppSettings: { frequency: 1, capping: 0.1, interval: 30, timeout: 0, everyPage: false }
+      });
+    } else if (adType === 1) {
+      // Rewarded Popup
+      show_10391340('pop').catch(e => {});
+    } else {
+      // Rewarded Interstitial
+      show_10391340().catch(e => {});
+    }
   }
 
   // Show countdown
