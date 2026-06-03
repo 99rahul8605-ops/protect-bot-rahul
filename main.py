@@ -836,21 +836,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if context.args:
         encoded_id = context.args[0]
 
-        # Handle startapp=courses from group button
+        # Handle start=courses from group button - open mini app directly
         if encoded_id == "courses":
             base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
             courses_url = f"{base_url}/courses"
             keyboard = [[InlineKeyboardButton(
-                "📚 View All Courses & Batches",
+                "📚 Open Courses",
                 web_app=WebAppInfo(url=courses_url),
                 api_kwargs={"style": "success"}
             )]]
             await update.message.reply_text(
-                "📚 *Free Resources & Courses*\n\n"
-                "Click the button below to browse all available courses and batches.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode=ParseMode.MARKDOWN,
-                disable_web_page_preview=True
+                "👆 Tap to open",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
             return
 
@@ -1680,16 +1677,14 @@ async def on_startup():
     bot_info = await telegram_bot_app.bot.get_me()
     logger.info(f"Bot: @{bot_info.username}")
 
-    # Set WebApp Menu Button via Bot API (shows button in bot private chat)
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
-    courses_url = f"{base_url}/courses"
+    # Reset menu button to default (commands list)
     try:
         await telegram_bot_app.bot.set_chat_menu_button(
-            menu_button={"type": "web_app", "text": "📚 Courses", "web_app": {"url": courses_url}}
+            menu_button={"type": "commands"}
         )
-        logger.info(f"WebApp menu button set to: {courses_url}")
+        logger.info("Menu button reset to commands list")
     except Exception as e:
-        logger.error(f"Error setting WebApp menu button: {e}")
+        logger.error(f"Error resetting menu button: {e}")
     
     # Pre-fetch channel info for faster /start responses (without force refresh)
     try:
