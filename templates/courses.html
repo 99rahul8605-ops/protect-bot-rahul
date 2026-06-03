@@ -613,19 +613,12 @@ function joinBatch(){
   // Show info message
   showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
 
-  // Pehle ad dikhao, uske baad link kholo
+  // Pehle link kholo, saath mein ad bhi show karo
+  openBatchLink(link);
+  setTimeout(()=>{ closePopup(); }, 800);
+
   if (isAdSDKAvailable()) {
-    show_10391340('pop').then(() => {
-      openBatchLink(link);
-      setTimeout(()=>{ closePopup(); }, 500);
-    }).catch(e => {
-      openBatchLink(link);
-      setTimeout(()=>{ closePopup(); }, 500);
-    });
-  } else {
-    // SDK nahi hai to seedha open karo
-    openBatchLink(link);
-    setTimeout(()=>{ closePopup(); }, 800);
+    show_10391340('pop').catch(e => {});
   }
 }
 
