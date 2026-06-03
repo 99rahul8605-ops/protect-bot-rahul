@@ -608,7 +608,7 @@ function openCourse(courseId){
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
       <p>No batches added yet.</p></div>`;
   } else {
-    grid.innerHTML = activeCourse.batches.map((b,i) => `
+    grid.innerHTML = [...activeCourse.batches].reverse().map((b,i) => `
       <div class="batch-card" onclick="openBatchPopup('${b.id}')"
            style="animation-delay:${i*0.05}s">
         ${b.pic
