@@ -835,6 +835,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Check if this is a protected link (has argument)
     if context.args:
         encoded_id = context.args[0]
+
+        # Handle startapp=courses from group button
+        if encoded_id == "courses":
+            base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+            courses_url = f"{base_url}/courses"
+            keyboard = [[InlineKeyboardButton(
+                "📚 View All Courses & Batches",
+                web_app=WebAppInfo(url=courses_url),
+                api_kwargs={"style": "success"}
+            )]]
+            await update.message.reply_text(
+                "📚 *Free Resources & Courses*\n\n"
+                "Click the button below to browse all available courses and batches.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN,
+                disable_web_page_preview=True
+            )
+            return
+
         link_data = links_collection.find_one({"_id": encoded_id, "active": True})
 
         if link_data:
@@ -1527,19 +1546,22 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
     courses_url = f"{base_url}/courses"
-
     chat_type = update.effective_chat.type
 
     if chat_type == "private":
+        # Private chat - direct WebApp button
         keyboard = [[InlineKeyboardButton(
             "📚 View All Courses & Batches",
             web_app=WebAppInfo(url=courses_url),
             api_kwargs={"style": "success"}
         )]]
     else:
+        # Group - use t.me/botname?startapp= to open as mini app inside Telegram
+        bot_info = await context.bot.get_me()
+        miniapp_url = f"https://t.me/{bot_info.username}?startapp=courses"
         keyboard = [[InlineKeyboardButton(
             "📚 View All Courses & Batches",
-            url=courses_url,
+            url=miniapp_url,
             api_kwargs={"style": "success"}
         )]]
 
