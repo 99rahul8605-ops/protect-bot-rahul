@@ -1215,12 +1215,8 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     admin_id = int(os.environ.get("ADMIN_ID", 0))
     if update.effective_user.id != admin_id:
         await update.message.reply_text(
-            "🔒 *Admin Access Required*
-
-"
-            "This command is restricted to administrators only.
-
-"
+            "🔒 *Admin Access Required*\n\n"
+            "This command is restricted to administrators only.\n\n"
             "*Contact:* https://t.me/team\_secret\_cont\_bot",
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True
@@ -1233,38 +1229,20 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     if not update.message.reply_to_message:
         await update.message.reply_text(
-            "📢 *Broadcast System*
-
-"
-            "To broadcast a message:
-"
-            "1. Send any message
-"
-            "2. Reply to it with `/broadcast`
-"
-            "3. Confirm the action
-
-"
-            "✨ *Flags:*
-"
-            "• `/broadcast --p` → Pin message after sending
-"
-            "• `/broadcast --f` → Forward instead of copy
-"
-            "• `/broadcast --p --f` → Forward + Pin
-
-"
-            "✨ *Features:*
-"
-            "• Supports all media types
-"
-            "• Preserves formatting
-"
-            "• Tracks delivery
-"
-            "• No rate limiting
-
-"
+            "📢 *Broadcast System*\n\n"
+            "To broadcast a message:\n"
+            "1. Send any message\n"
+            "2. Reply to it with `/broadcast`\n"
+            "3. Confirm the action\n\n"
+            "✨ *Flags:*\n"
+            "• `/broadcast --p` → Pin message after sending\n"
+            "• `/broadcast --f` → Forward instead of copy\n"
+            "• `/broadcast --p --f` → Forward + Pin\n\n"
+            "✨ *Features:*\n"
+            "• Supports all media types\n"
+            "• Preserves formatting\n"
+            "• Tracks delivery\n"
+            "• No rate limiting\n\n"
             "*Contact:* https://t.me/team\_secret\_cont\_bot",
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True
@@ -1296,20 +1274,12 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     content_type = getattr(update.message.reply_to_message, "content_type", "text")
 
     await update.message.reply_text(
-        f"⚠️ *Broadcast Confirmation*
-
-"
-        f"📊 *Delivery Stats:*
-"
-        f"• 📨 Recipients: `{total_users}` users
-"
-        f"• 📝 Type: {content_type}
-"
-        f"• ⚙️ Mode: {mode_label}
-"
-        f"• ⚡ Delivery: Instant
-
-"
+        f"⚠️ *Broadcast Confirmation*\n\n"
+        f"📊 *Delivery Stats:*\n"
+        f"• 📨 Recipients: `{total_users}` users\n"
+        f"• 📝 Type: {content_type}\n"
+        f"• ⚙️ Mode: {mode_label}\n"
+        f"• ⚡ Delivery: Instant\n\n"
         f"Are you sure you want to proceed?",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
@@ -1337,9 +1307,7 @@ async def handle_broadcast_confirmation(update: Update, context: ContextTypes.DE
         api_kwargs={"style": "danger"}
     )]]
     await query.message.edit_text(
-        "📤 *Broadcasting...*
-
-Please wait, this may take a moment.",
+        "📤 *Broadcasting...*\n\nPlease wait, this may take a moment.",
         reply_markup=InlineKeyboardMarkup(cancel_keyboard),
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
@@ -1395,32 +1363,20 @@ Please wait, this may take a moment.",
     })
 
     success_rate = (successful / total_users * 100) if total_users > 0 else 0
-    status   = "⛔ *Broadcast Stopped!*" if was_cancelled else "✅ *Broadcast Complete!*"
-    pin_line  = f"• 📌 Pinned: `{pinned}`
-" if pin_msg else ""
-    mode_line = "• 📨 Mode: Forward
-" if forward_msg else "• 📋 Mode: Copy
-"
+    status    = "⛔ *Broadcast Stopped!*" if was_cancelled else "✅ *Broadcast Complete!*"
+    pin_line  = f"• 📌 Pinned: `{pinned}`\n" if pin_msg else ""
+    mode_line = "• 📨 Mode: Forward\n" if forward_msg else "• 📋 Mode: Copy\n"
 
     await query.message.edit_text(
-        f"{status}
-
-"
-        f"📊 *Delivery Report:*
-"
-        f"• 📨 Total Recipients: `{total_users}`
-"
-        f"• ✅ Successful: `{successful}`
-"
-        f"• ❌ Failed: `{failed}`
-"
+        f"{status}\n\n"
+        f"📊 *Delivery Report:*\n"
+        f"• 📨 Total Recipients: `{total_users}`\n"
+        f"• ✅ Successful: `{successful}`\n"
+        f"• ❌ Failed: `{failed}`\n"
         f"{pin_line}"
         f"{mode_line}"
-        f"• 📈 Success Rate: `{success_rate:.1f}%`
-"
-        f"• ⏰ Time: {datetime.datetime.now().strftime('%H:%M:%S')}
-
-"
+        f"• 📈 Success Rate: `{success_rate:.1f}%`\n"
+        f"• ⏰ Time: {datetime.datetime.now().strftime('%H:%M:%S')}\n\n"
         f"✨ Broadcast logged in system.",
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
@@ -1568,34 +1524,30 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Send courses page button."""
     if await maintenance_check(update, context):
         return
-    
+
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
     user_id = update.effective_user.id
     courses_url = f"{base_url}/courses?user_id={user_id}"
-    
-    chat_type = update.effective_chat.type  # private, group, supergroup, channel
-    
+
+    chat_type = update.effective_chat.type
+
     if chat_type == "private":
-        # WebApp button only works in private chat
         keyboard = [[InlineKeyboardButton(
             "📚 View All Courses & Batches",
             web_app=WebAppInfo(url=courses_url),
-            api_kwargs={'style': 'success'}
+            api_kwargs={"style": "success"}
         )]]
     else:
-        # Groups/supergroups: use url button
         keyboard = [[InlineKeyboardButton(
             "📚 View All Courses & Batches",
             url=courses_url,
-            api_kwargs={'style': 'success'}
+            api_kwargs={"style": "success"}
         )]]
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        "📚 *Free Resources & Courses*
 
-"
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "📚 *Free Resources & Courses*\n\n"
         "Click the button below to browse all available courses and batches.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
