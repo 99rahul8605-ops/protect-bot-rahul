@@ -502,13 +502,20 @@ if(tg){
   tg.ready(); 
   tg.expand();
 
-  // Inject initData into URL so backend can verify user securely
-  if(tg.initData && !window.location.search.includes('initData')){
-    const sep = window.location.search ? '&' : '?';
-    const newUrl = window.location.href + sep + 'initData=' + encodeURIComponent(tg.initData);
-    window.history.replaceState({}, '', newUrl);
-    // Reload so server gets initData for user verification
-    window.location.replace(newUrl);
+  // Extract user info from initData directly in JS (no reload needed)
+  if(tg.initData){
+    try{
+      const params = new URLSearchParams(tg.initData);
+      const userStr = params.get('user');
+      if(userStr){
+        const userObj = JSON.parse(userStr);
+        const tgUserId = userObj.id;
+        const adminId = parseInt("{{ admin_id }}");
+        if(tgUserId && adminId && tgUserId === adminId){
+          document.getElementById('admin-btn').style.display = 'flex';
+        }
+      }
+    }catch(e){}
   }
   // Fix viewport height for Telegram
   document.documentElement.style.setProperty('--tg-viewport-height', tg.viewportHeight + 'px');
