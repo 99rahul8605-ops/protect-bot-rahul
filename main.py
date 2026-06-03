@@ -1341,7 +1341,8 @@ async def handle_broadcast_confirmation(update: Update, context: ContextTypes.DE
     failed = 0
     pinned = 0
 
-    for user in users:
+    last_update = 0
+    for i, user in enumerate(users):
         if broadcast_cancel_event.is_set():
             break
         try:
@@ -1366,6 +1367,25 @@ async def handle_broadcast_confirmation(update: Update, context: ContextTypes.DE
                     pass
 
             successful += 1
+
+            # Update progress every 20 users
+            if successful - last_update >= 20:
+                last_update = successful
+                try:
+                    await query.message.edit_text(
+                        f"📤 *Broadcasting...*\n\n"
+                        f"✅ Sent: `{successful}` / `{total_users}`\n"
+                        f"❌ Failed: `{failed}`",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                            "⛔ Stop Broadcast",
+                            callback_data="cancel_broadcast",
+                            api_kwargs={"style": "danger"}
+                        )]]),
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                except Exception:
+                    pass
+
             await asyncio.sleep(0.05)
         except Exception as e:
             logger.error(f"Failed: {user['user_id']}: {e}")
