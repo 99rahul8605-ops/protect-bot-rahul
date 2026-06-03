@@ -894,7 +894,8 @@ I help you keep your channel links safe & secure.
                     button_text = f"🌟 {ch['title'][:15]}"  # Limit text length
                     row_buttons.append(InlineKeyboardButton(
                         button_text,
-                        web_app=WebAppInfo(url=ch["invite_link"])
+                        url=ch["invite_link"],
+                style='primary'
                     ))
             if row_buttons:
                 keyboard.append(row_buttons)
@@ -903,19 +904,19 @@ I help you keep your channel links safe & secure.
     keyboard.append([
         InlineKeyboardButton(
             "📺 Tutorial",
-            web_app=WebAppInfo(url="https://t.me/team_secret_tutorial_video/5")
-        ),
+            url="https://t.me/team_secret_tutorial_video/5",
+                style='primary'),
         InlineKeyboardButton(
             "📞 Contact",
-            web_app=WebAppInfo(url="https://t.me/team_secret_cont_bot")
-        )
+            url="https://t.me/team_secret_cont_bot",
+                style='primary')
     ])
     
-    # Add create link button (green)
+    # Add create link button (green success)
     keyboard.append([InlineKeyboardButton(
         "🚀 Create Protected Link",
         callback_data="create_link",
-        style='success'
+                style='success'
     )])
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
@@ -1012,7 +1013,8 @@ async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [
             InlineKeyboardButton(
                 "📤 Share",
-                web_app=WebAppInfo(url=f"https://t.me/share/url?url={protected_link}&text=🔐 Protected Link - Join via secure invitation")
+                url=f"https://t.me/share/url?url={protected_link}&text=🔐 Protected Link - Join via secure invitation",
+                style='primary'
             ),
             InlineKeyboardButton(
                 "❌ Revoke",
@@ -1023,12 +1025,12 @@ async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [
             InlineKeyboardButton(
                 "📺 Tutorial",
-                web_app=WebAppInfo(url="https://t.me/team_secret_tutorial_video/5")
-            ),
+                url="https://t.me/team_secret_tutorial_video/5",
+                style='primary'),
             InlineKeyboardButton(
                 "📞 Contact",
-                web_app=WebAppInfo(url="https://t.me/team_secret_cont_bot")
-            )
+                url="https://t.me/team_secret_cont_bot",
+                style='primary')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1094,12 +1096,12 @@ async def revoke_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard.append([
             InlineKeyboardButton(
                 "📺 Tutorial",
-                web_app=WebAppInfo(url="https://t.me/team_secret_tutorial_video/5")
-            ),
+                url="https://t.me/team_secret_tutorial_video/5",
+                style='primary'),
             InlineKeyboardButton(
                 "📞 Contact",
-                web_app=WebAppInfo(url="https://t.me/team_secret_cont_bot")
-            )
+                url="https://t.me/team_secret_cont_bot",
+                style='primary')
         ])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1392,8 +1394,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     button_text = f"🌟 {ch['title'][:15]}"  # Limit text length
                     row_buttons.append(InlineKeyboardButton(
                         button_text,
-                        web_app=WebAppInfo(url=ch["invite_link"])
-                    ))
+                        url=ch["invite_link"],
+                style='primary'))
             if row_buttons:
                 keyboard.append(row_buttons)
     
@@ -1401,12 +1403,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     keyboard.append([
         InlineKeyboardButton(
             "📺 Tutorial",
-            web_app=WebAppInfo(url="https://t.me/team_secret_tutorial_video/5")
-        ),
+            url="https://t.me/team_secret_tutorial_video/5",
+                style='primary'),
         InlineKeyboardButton(
             "📞 Contact",
-            web_app=WebAppInfo(url="https://t.me/team_secret_cont_bot")
-        )
+            url="https://t.me/team_secret_cont_bot",
+                style='primary')
     ])
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
