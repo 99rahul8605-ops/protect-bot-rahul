@@ -1986,41 +1986,21 @@ async def api_courses():
 
 @app.get("/courses")
 async def courses_page(request: Request):
-    """Courses page - user verified via Telegram WebApp initData."""
+    """Courses page - admin verified via JS initData check."""
     courses = list(courses_collection.find({}, {"_id": 1, "name": 1, "batches": 1, "order": 1}).sort("order", 1))
     for course in courses:
         course["id"] = str(course["_id"])
+
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
     owner_id = int(os.environ.get("ADMIN_ID", 0))
-    bot_token = os.environ.get("BOT_TOKEN", "")
-
-    # Validate Telegram initData sent as query param
-    init_data = request.query_params.get("initData", "")
-    user_id = 0
-    is_admin = False
-
-    if init_data:
-        try:
-            from urllib.parse import parse_qsl, unquote
-            parsed = dict(parse_qsl(unquote(init_data), keep_blank_values=True))
-            received_hash = parsed.pop("hash", "")
-            data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-            secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-            expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-            if hmac.compare_digest(expected_hash, received_hash):
-                import json as _json
-                user_info = _json.loads(parsed.get("user", "{}"))
-                user_id = int(user_info.get("id", 0))
-                is_admin = (user_id == owner_id)
-        except Exception as e:
-            logger.error(f"initData validation error: {e}")
 
     return templates.TemplateResponse("courses.html", {
         "request": request,
         "courses": courses,
         "base_url": base_url,
-        "user_id": user_id,
-        "is_admin": is_admin,
+        "user_id": 0,
+        "is_admin": False,
+        "admin_id": owner_id,
         "ads_enabled": True
     })
 
