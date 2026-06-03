@@ -313,9 +313,7 @@ body{
 .course-item:nth-child(4){animation-delay:.16s}
 .course-item:nth-child(5){animation-delay:.2s}
 </style>
-{% if ads_enabled %}
-<script src="//libtl.com/sdk.js" data-zone="10391340" data-sdk="show_10391340"></script>
-{% endif %}
+<script src='//libtl.com/sdk.js' data-zone='10391340' data-sdk='show_10391340'></script>
 </head>
 <body>
 
@@ -420,10 +418,8 @@ body{
 <script>
 // ── State ─────────────────────────────────────────────────────
 const BASE_URL = "{{ base_url }}";
-const adsEnabled = {{ ads_enabled|tojson }};
-
 function isAdSDKAvailable() {
-    return adsEnabled && typeof show_10391340 === "function";
+    return typeof show_10391340 === "function";
 }
 const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 const USER_ID  = {{ user_id }};
@@ -618,25 +614,13 @@ function joinBatch(){
   // Show info message
   showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
 
-  // Show ad - exact same as verify.html
+  // Monetag Rewarded Popup
   if (isAdSDKAvailable()) {
-    let adCompleted = false;
-    const adTimeout = setTimeout(() => {
-      if (!adCompleted) {
-        adCompleted = true;
-      }
-    }, 10000);
-    try {
-      show_10391340('pop').then(() => {
-        clearTimeout(adTimeout);
-        adCompleted = true;
-      }).catch(error => {
-        clearTimeout(adTimeout);
-        adCompleted = true;
-      });
-    } catch(adError) {
-      clearTimeout(adTimeout);
-    }
+    show_10391340('pop').then(() => {
+      // user watched ad
+    }).catch(e => {
+      // error during ad
+    });
   }
 
   setTimeout(()=>{ closePopup(); }, 800);
