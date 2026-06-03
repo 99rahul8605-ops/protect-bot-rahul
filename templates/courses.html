@@ -335,9 +335,8 @@ body{
   <div class="wrap">
     <div class="hero">
       <img class="brand-logo"
-           src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg"
-           alt="Team Secret"
-           onerror="this.style.display='none'"/>
+           src="https://i.ibb.co/8g2YxXq6/tmpyb9cwaub.jpg"
+           alt="Team Secret"/>
       <div class="brand-tag">Team Secret</div>
       <h1>Courses & Batches</h1>
       <p>Select a course to view available batches</p>
@@ -612,16 +611,56 @@ function joinBatch(){
     window.open(link, '_blank');
   }
 
+  // Show info message
+  showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
+
   // Show ad after link opens
   if(typeof show_10391340 === 'function'){
     setTimeout(()=>{
-      try{
-        show_10391340('pop').catch(()=>{});
-      }catch(e){}
+      try{ show_10391340('pop').catch(()=>{}); }catch(e){}
     }, 800);
   }
 
   setTimeout(()=>{ closePopup(); }, 800);
+}
+
+// ── Info Message ──────────────────────────────────────────────
+function showInfoMsg(msg){
+  let el = document.getElementById('info-msg');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'info-msg';
+    el.style.cssText = `
+      position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);
+      z-index:99999;
+      background:linear-gradient(135deg,#1e3a5f,#1a2a4a);
+      border:1px solid rgba(96,165,250,.45);
+      color:#93c5fd;
+      padding:12px 20px;
+      border-radius:14px;
+      font-size:13px;
+      font-family:'DM Sans',sans-serif;
+      font-weight:500;
+      max-width:320px;
+      width:calc(100% - 40px);
+      text-align:center;
+      box-shadow:0 8px 32px rgba(0,0,0,.5);
+      transition:transform .4s cubic-bezier(.34,1.15,.64,1), opacity .4s ease;
+      opacity:0;
+      pointer-events:none;
+    `;
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(()=>{
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  clearTimeout(el._timer);
+  el._timer = setTimeout(()=>{
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(-80px)';
+  }, 3000);
 }
 
 // ── Admin: Render ─────────────────────────────────────────────
