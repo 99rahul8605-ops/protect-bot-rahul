@@ -1546,20 +1546,29 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
     courses_url = f"{base_url}/courses"
+    chat_type = update.effective_chat.type
 
-    # web_app=WebAppInfo works in both private and group chats
-    keyboard = [[InlineKeyboardButton(
-        "📚 View All Courses & Batches",
-        web_app=WebAppInfo(url=courses_url),
-        api_kwargs={"style": "success"}
-    )]]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    if chat_type == "private":
+        # Private chat - WebApp button works fine
+        keyboard = [[InlineKeyboardButton(
+            "📚 View All Courses & Batches",
+            web_app=WebAppInfo(url=courses_url),
+            api_kwargs={"style": "success"}
+        )]]
+        text = "📚 *Free Resources & Courses*\n\nClick the button below to browse all available courses and batches."
+    else:
+        # Group - WebApp not supported, send user to bot private chat
+        bot_info = await context.bot.get_me()
+        keyboard = [[InlineKeyboardButton(
+            "📚 View All Courses & Batches",
+            url=f"https://t.me/{bot_info.username}?start=courses",
+            api_kwargs={"style": "success"}
+        )]]
+        text = "📚 *Free Resources & Courses*\n\nClick the button — it will open in bot chat as Mini App."
 
     await update.message.reply_text(
-        "📚 *Free Resources & Courses*\n\n"
-        "Click the button below to browse all available courses and batches.",
-        reply_markup=reply_markup,
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True
     )
@@ -1670,6 +1679,17 @@ async def on_startup():
     
     bot_info = await telegram_bot_app.bot.get_me()
     logger.info(f"Bot: @{bot_info.username}")
+
+    # Set WebApp Menu Button via Bot API (shows button in bot private chat)
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    courses_url = f"{base_url}/courses"
+    try:
+        await telegram_bot_app.bot.set_chat_menu_button(
+            menu_button={"type": "web_app", "text": "📚 Courses", "web_app": {"url": courses_url}}
+        )
+        logger.info(f"WebApp menu button set to: {courses_url}")
+    except Exception as e:
+        logger.error(f"Error setting WebApp menu button: {e}")
     
     # Pre-fetch channel info for faster /start responses (without force refresh)
     try:
