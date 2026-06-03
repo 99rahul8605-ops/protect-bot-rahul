@@ -231,6 +231,29 @@ body{
   margin-bottom:10px;display:none;
 }
 
+/* ── EDIT MODAL ── */
+.edit-modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.edit-modal-overlay.show{opacity:1;pointer-events:all;}
+.edit-modal{
+  background:var(--card);border:1px solid var(--border2);border-radius:20px;
+  padding:24px 20px;width:calc(100% - 40px);max-width:400px;
+  transform:translateY(20px);transition:transform .25s;
+}
+.edit-modal-overlay.show .edit-modal{transform:translateY(0);}
+.edit-modal h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin:0 0 16px;color:var(--text);}
+.edit-modal .inp{margin-bottom:10px;}
+.edit-modal-actions{display:flex;gap:10px;margin-top:14px;}
+.edit-btn{
+  background:rgba(124,92,252,.15);border:1px solid rgba(124,92,252,.3);
+  color:var(--accent);border-radius:8px;padding:5px 10px;font-size:12px;
+  cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .2s;
+}
+.edit-btn:hover{background:rgba(124,92,252,.25);}
+
 /* ── EMPTY ── */
 .empty{text-align:center;padding:60px 20px;color:var(--muted);}
 .empty svg{opacity:.25;margin-bottom:14px;}
@@ -446,6 +469,18 @@ body{
 </div>
 
 <div id="toast"></div>
+
+<!-- Edit Modal -->
+<div class="edit-modal-overlay" id="edit-modal-overlay" onclick="closeEditModal(event)">
+  <div class="edit-modal" id="edit-modal">
+    <h3 id="edit-modal-title">Edit</h3>
+    <div id="edit-modal-body"></div>
+    <div class="edit-modal-actions">
+      <button class="btn btn-green" style="flex:1" onclick="saveEdit()">Save</button>
+      <button class="btn" style="flex:1;background:rgba(255,255,255,.06);color:var(--muted)" onclick="closeEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── State ─────────────────────────────────────────────────────
@@ -768,6 +803,10 @@ function renderAdminCourses(){
         <div class="adot"></div>
         <div class="admin-course-name">${escHtml(c.name)}</div>
         <span style="font-size:12px;color:var(--muted)">${c.batches.length} batch${c.batches.length!==1?'es':''}</span>
+        <button class="edit-btn" onclick="editCourse('${c.id}','${escHtml(c.name)}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
         <button class="btn btn-danger btn-sm" onclick="deleteCourse('${c.id}','${escHtml(c.name)}')">Delete</button>
       </div>
 
@@ -784,6 +823,9 @@ function renderAdminCourses(){
                 <div class="bname">${escHtml(b.name)}</div>
                 <div class="blink">${escHtml(b.link)}</div>
               </div>
+              <button class="edit-btn" style="margin-right:4px;" onclick="editBatch('${c.id}','${b.id}','${escHtml(b.name)}','${escHtml(b.link)}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
               <button class="del-btn" onclick="deleteBatch('${c.id}','${b.id}')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
@@ -906,6 +948,69 @@ async function deleteBatch(courseId, batchId){
     toast('Batch deleted','success');
     await loadCourses();
   } catch(e){ toast('Network error','error'); }
+}
+
+// ── Admin: Edit Course ───────────────────────────────────────
+let editState = {};
+
+function editCourse(courseId, name){
+  editState = { type:'course', courseId };
+  document.getElementById('edit-modal-title').textContent = 'Edit Course Name';
+  document.getElementById('edit-modal-body').innerHTML = `
+    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Course name" autocomplete="off"/>
+  `;
+  document.getElementById('edit-modal-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
+}
+
+function editBatch(courseId, batchId, name, link){
+  editState = { type:'batch', courseId, batchId };
+  document.getElementById('edit-modal-title').textContent = 'Edit Batch';
+  document.getElementById('edit-modal-body').innerHTML = `
+    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Batch name" autocomplete="off"/>
+    <input class="inp" id="edit-inp-link" type="text" value="${link}" placeholder="https://t.me/..." autocomplete="off"/>
+  `;
+  document.getElementById('edit-modal-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
+}
+
+function closeEditModal(e){
+  if(e && e.target !== document.getElementById('edit-modal-overlay')) return;
+  document.getElementById('edit-modal-overlay').classList.remove('show');
+  editState = {};
+}
+
+async function saveEdit(){
+  if(editState.type === 'course'){
+    const name = document.getElementById('edit-inp-name').value.trim();
+    if(!name) return toast('Enter course name','error');
+    try {
+      const res = await fetch(BASE_URL+'/admin/courses/edit_course',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, name})
+      });
+      if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      toast('Course updated!','success');
+      document.getElementById('edit-modal-overlay').classList.remove('show');
+      await loadCourses(); renderAdminCourses();
+    } catch(e){ toast('Network error','error'); }
+
+  } else if(editState.type === 'batch'){
+    const name = document.getElementById('edit-inp-name').value.trim();
+    const link = document.getElementById('edit-inp-link').value.trim();
+    if(!name) return toast('Enter batch name','error');
+    if(!link||!link.startsWith('https://t.me/')) return toast('Enter valid t.me link','error');
+    try {
+      const res = await fetch(BASE_URL+'/admin/courses/edit_batch',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link})
+      });
+      if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      toast('Batch updated!','success');
+      document.getElementById('edit-modal-overlay').classList.remove('show');
+      await loadCourses(); renderAdminCourses();
+    } catch(e){ toast('Network error','error'); }
+  }
 }
 
 // ── Toast ─────────────────────────────────────────────────────
