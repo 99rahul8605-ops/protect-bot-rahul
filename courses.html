@@ -14,11 +14,17 @@
   --gold:#f5c842; --text:#f0eeff; --muted:#8a889a; --radius:16px;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
+html{height:100%;overflow:hidden;}
+body{
+  background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;
+  height:100vh;min-height:100vh;
+  overflow:hidden;
+  position:fixed;width:100%;
+}
 
 /* ── SCREENS ── */
-.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+.screen{position:absolute;inset:0;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
   transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s ease;
   will-change:transform;}
 .screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none;}
@@ -133,8 +139,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
 
 /* ── POPUP OVERLAY ── */
 .overlay{
-  position:fixed;inset:0;z-index:100;
+  position:fixed;inset:0;z-index:9999;
   background:rgba(0,0,0,.75);backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
   display:flex;align-items:flex-end;justify-content:center;
   opacity:0;pointer-events:none;
   transition:opacity .25s ease;
@@ -199,6 +206,53 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
   background:linear-gradient(135deg,var(--green),#16a34a);
   box-shadow:0 4px 20px rgba(34,197,94,.35);
 }
+.gen-btn{
+  width:100%;padding:15px;border-radius:16px;border:2px solid var(--accent);
+  background:transparent;
+  color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:opacity .2s,transform .15s,box-shadow .2s;
+  letter-spacing:.3px;margin-bottom:10px;
+}
+.gen-btn:active{transform:scale(.97);opacity:.9;}
+.gen-btn:hover{background:rgba(124,92,252,.1);}
+.countdown-bar{
+  width:100%;height:4px;border-radius:4px;
+  background:rgba(255,255,255,0.08);
+  margin-bottom:10px;overflow:hidden;display:none;
+}
+.countdown-bar-fill{
+  height:100%;width:100%;border-radius:4px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width 1s linear;
+}
+.countdown-txt{
+  text-align:center;font-size:12px;color:var(--muted);
+  margin-bottom:10px;display:none;
+}
+
+/* ── EDIT MODAL ── */
+.edit-modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.edit-modal-overlay.show{opacity:1;pointer-events:all;}
+.edit-modal{
+  background:var(--card);border:1px solid var(--border2);border-radius:20px;
+  padding:24px 20px;width:calc(100% - 40px);max-width:400px;
+  transform:translateY(20px);transition:transform .25s;
+}
+.edit-modal-overlay.show .edit-modal{transform:translateY(0);}
+.edit-modal h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin:0 0 16px;color:var(--text);}
+.edit-modal .inp{margin-bottom:10px;}
+.edit-modal-actions{display:flex;gap:10px;margin-top:14px;}
+.edit-btn{
+  background:rgba(124,92,252,.15);border:1px solid rgba(124,92,252,.3);
+  color:var(--accent);border-radius:8px;padding:5px 10px;font-size:12px;
+  cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .2s;
+}
+.edit-btn:hover{background:rgba(124,92,252,.25);}
 
 /* ── EMPTY ── */
 .empty{text-align:center;padding:60px 20px;color:var(--muted);}
@@ -306,6 +360,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
 .course-item:nth-child(4){animation-delay:.16s}
 .course-item:nth-child(5){animation-delay:.2s}
 </style>
+<script src='//libtl.com/sdk.js' data-zone='10391340' data-sdk='show_10391340'></script>
 </head>
 <body>
 
@@ -325,9 +380,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
   <div class="wrap">
     <div class="hero">
       <img class="brand-logo"
-           src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg"
-           alt="Team Secret"
-           onerror="this.style.display='none'"/>
+           src="https://i.ibb.co/8g2YxXq6/tmpyb9cwaub.jpg"
+           alt="Team Secret"/>
       <div class="brand-tag">Team Secret</div>
       <h1>Courses & Batches</h1>
       <p>Select a course to view available batches</p>
@@ -396,7 +450,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
     </div>
     <div class="popup-divider"></div>
     <div style="padding:0 20px;">
-      <button class="join-btn" id="join-btn" onclick="joinBatch()">
+      <button class="gen-btn" id="gen-btn" onclick="generateLink()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Generate Link
+      </button>
+      <div class="countdown-bar" id="countdown-bar"><div class="countdown-bar-fill" id="countdown-fill"></div></div>
+      <div class="countdown-txt" id="countdown-txt"></div>
+      <button class="join-btn" id="join-btn" onclick="joinBatch()" style="display:none;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
         </svg>
@@ -408,12 +470,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
 
 <div id="toast"></div>
 
+<!-- Edit Modal -->
+<div class="edit-modal-overlay" id="edit-modal-overlay" onclick="closeEditModal(event)">
+  <div class="edit-modal" id="edit-modal">
+    <h3 id="edit-modal-title">Edit</h3>
+    <div id="edit-modal-body"></div>
+    <div class="edit-modal-actions">
+      <button class="btn btn-green" style="flex:1" onclick="saveEdit()">Save</button>
+      <button class="btn" style="flex:1;background:rgba(255,255,255,.06);color:var(--muted)" onclick="closeEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── State ─────────────────────────────────────────────────────
 const BASE_URL = "{{ base_url }}";
-const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+function isAdSDKAvailable() {
+    return typeof show_10391340 === "function";
+}
+let IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 const USER_ID  = {{ user_id }};
-const ADMIN_ID_VAL = {{ user_id if is_admin else 0 }};
+let ADMIN_ID_VAL = {{ user_id if is_admin else 0 }};
 
 let allCourses = [];
 let activeCourse = null;
@@ -421,7 +498,33 @@ let activeBatch = null;
 
 // ── Telegram WebApp ───────────────────────────────────────────
 const tg = window.Telegram?.WebApp;
-if(tg){ tg.ready(); tg.expand(); }
+if(tg){ 
+  tg.ready(); 
+  tg.expand();
+
+  // Extract user info from initData directly in JS (no reload needed)
+  if(tg.initData){
+    try{
+      const params = new URLSearchParams(tg.initData);
+      const userStr = params.get('user');
+      if(userStr){
+        const userObj = JSON.parse(userStr);
+        const tgUserId = userObj.id;
+        const adminId = parseInt("{{ admin_id }}");
+        if(tgUserId && adminId && tgUserId === adminId){
+          ADMIN_ID_VAL = adminId;
+          IS_ADMIN = true;
+          document.getElementById('admin-btn').style.display = 'flex';
+        }
+      }
+    }catch(e){}
+  }
+  // Fix viewport height for Telegram
+  document.documentElement.style.setProperty('--tg-viewport-height', tg.viewportHeight + 'px');
+  tg.onEvent('viewportChanged', () => {
+    document.documentElement.style.setProperty('--tg-viewport-height', tg.viewportHeight + 'px');
+  });
+}
 
 // ── Init ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -505,7 +608,7 @@ function openCourse(courseId){
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
       <p>No batches added yet.</p></div>`;
   } else {
-    grid.innerHTML = activeCourse.batches.map((b,i) => `
+    grid.innerHTML = [...activeCourse.batches].reverse().map((b,i) => `
       <div class="batch-card" onclick="openBatchPopup('${b.id}')"
            style="animation-delay:${i*0.05}s">
         ${b.pic
@@ -549,10 +652,23 @@ function openBatchPopup(batchId){
       </svg></div>`;
   }
 
+  // Reset join button
   const btn = document.getElementById('join-btn');
   btn.classList.remove('sent');
   btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Join Batch`;
+  btn.style.display = 'none'; // hide join btn
+
+  // Reset generate link button
+  const genBtn = document.getElementById('gen-btn');
+  genBtn.style.display = 'flex';
+  genBtn.disabled = false;
+  genBtn.style.opacity = '1';
+
+  // Reset countdown
+  document.getElementById('countdown-bar').style.display = 'none';
+  document.getElementById('countdown-txt').style.display = 'none';
+  document.getElementById('countdown-fill').style.width = '100%';
 
   document.getElementById('batch-popup').classList.add('show');
 }
@@ -567,25 +683,128 @@ function closePopupOnBg(e){
 }
 
 // ── Join → Open batch link ────────────────────────────────────
+function generateLink(){
+  const genBtn = document.getElementById('gen-btn');
+  const joinBtn = document.getElementById('join-btn');
+  const bar = document.getElementById('countdown-bar');
+  const fill = document.getElementById('countdown-fill');
+  const txt = document.getElementById('countdown-txt');
+
+  // Disable gen button
+  genBtn.disabled = true;
+  genBtn.style.opacity = '0.5';
+
+  // Random se koi bhi ek ad show karo
+  if (isAdSDKAvailable()) {
+    const adType = Math.floor(Math.random() * 3);
+    if (adType === 0) {
+      // inApp Interstitial
+      show_10391340({
+        type: 'inApp',
+        inAppSettings: { frequency: 1, capping: 0.1, interval: 30, timeout: 0, everyPage: false }
+      });
+    } else if (adType === 1) {
+      // Rewarded Popup
+      show_10391340('pop').catch(e => {});
+    } else {
+      // Rewarded Interstitial
+      show_10391340().catch(e => {});
+    }
+  }
+
+  // Show countdown
+  bar.style.display = 'block';
+  txt.style.display = 'block';
+
+  let secs = 5;
+  txt.textContent = `Link ready in ${secs}s...`;
+  fill.style.width = '100%';
+
+  const timer = setInterval(() => {
+    secs--;
+    fill.style.width = (secs / 5 * 100) + '%';
+    txt.textContent = secs > 0 ? `Link ready in ${secs}s...` : 'Link ready!';
+    if (secs <= 0) {
+      clearInterval(timer);
+      // Hide gen button & countdown, show join button
+      genBtn.style.display = 'none';
+      bar.style.display = 'none';
+      txt.style.display = 'none';
+      joinBtn.style.display = 'flex';
+    }
+  }, 1000);
+}
+
+function openBatchLink(link){
+  try {
+    if(tg){
+      if(link.includes('t.me/') || link.includes('telegram.me/')){
+        tg.openTelegramLink(link);
+      } else {
+        tg.openLink(link);
+      }
+    } else {
+      window.open(link, '_blank');
+    }
+  } catch(err){
+    window.open(link, '_blank');
+  }
+}
+
 function joinBatch(){
   if(!activeBatch) return;
   const btn = document.getElementById('join-btn');
-
   btn.classList.add('sent');
   btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M20 6L9 17l-5-5"/></svg> Opening…`;
 
-  // Open the Telegram link
   const link = activeBatch.link;
-  if(tg && tg.openLink){
-    tg.openLink(link);
-  } else if(tg && tg.openTelegramLink && link.includes('t.me')){
-    tg.openTelegramLink(link);
-  } else {
-    window.open(link, '_blank');
-  }
 
+  // Show info message
+  showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
+
+  // Seedha link open karo - ad sirf Generate Link pe hoga
+  openBatchLink(link);
   setTimeout(()=>{ closePopup(); }, 800);
+}
+
+// ── Info Message ──────────────────────────────────────────────
+function showInfoMsg(msg){
+  let el = document.getElementById('info-msg');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'info-msg';
+    el.style.cssText = `
+      position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);
+      z-index:99999;
+      background:linear-gradient(135deg,#1e3a5f,#1a2a4a);
+      border:1px solid rgba(96,165,250,.45);
+      color:#93c5fd;
+      padding:12px 20px;
+      border-radius:14px;
+      font-size:13px;
+      font-family:'DM Sans',sans-serif;
+      font-weight:500;
+      max-width:320px;
+      width:calc(100% - 40px);
+      text-align:center;
+      box-shadow:0 8px 32px rgba(0,0,0,.5);
+      transition:transform .4s cubic-bezier(.34,1.15,.64,1), opacity .4s ease;
+      opacity:0;
+      pointer-events:none;
+    `;
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(()=>{
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  clearTimeout(el._timer);
+  el._timer = setTimeout(()=>{
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(-80px)';
+  }, 3000);
 }
 
 // ── Admin: Render ─────────────────────────────────────────────
@@ -602,6 +821,10 @@ function renderAdminCourses(){
         <div class="adot"></div>
         <div class="admin-course-name">${escHtml(c.name)}</div>
         <span style="font-size:12px;color:var(--muted)">${c.batches.length} batch${c.batches.length!==1?'es':''}</span>
+        <button class="edit-btn" onclick="editCourse('${c.id}','${escHtml(c.name)}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
         <button class="btn btn-danger btn-sm" onclick="deleteCourse('${c.id}','${escHtml(c.name)}')">Delete</button>
       </div>
 
@@ -618,6 +841,9 @@ function renderAdminCourses(){
                 <div class="bname">${escHtml(b.name)}</div>
                 <div class="blink">${escHtml(b.link)}</div>
               </div>
+              <button class="edit-btn" style="margin-right:4px;" onclick="editBatch('${c.id}','${b.id}','${escHtml(b.name)}','${escHtml(b.link)}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
               <button class="del-btn" onclick="deleteBatch('${c.id}','${b.id}')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
@@ -740,6 +966,69 @@ async function deleteBatch(courseId, batchId){
     toast('Batch deleted','success');
     await loadCourses();
   } catch(e){ toast('Network error','error'); }
+}
+
+// ── Admin: Edit Course ───────────────────────────────────────
+let editState = {};
+
+function editCourse(courseId, name){
+  editState = { type:'course', courseId };
+  document.getElementById('edit-modal-title').textContent = 'Edit Course Name';
+  document.getElementById('edit-modal-body').innerHTML = `
+    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Course name" autocomplete="off"/>
+  `;
+  document.getElementById('edit-modal-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
+}
+
+function editBatch(courseId, batchId, name, link){
+  editState = { type:'batch', courseId, batchId };
+  document.getElementById('edit-modal-title').textContent = 'Edit Batch';
+  document.getElementById('edit-modal-body').innerHTML = `
+    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Batch name" autocomplete="off"/>
+    <input class="inp" id="edit-inp-link" type="text" value="${link}" placeholder="https://t.me/..." autocomplete="off"/>
+  `;
+  document.getElementById('edit-modal-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
+}
+
+function closeEditModal(e){
+  if(e && e.target !== document.getElementById('edit-modal-overlay')) return;
+  document.getElementById('edit-modal-overlay').classList.remove('show');
+  editState = {};
+}
+
+async function saveEdit(){
+  if(editState.type === 'course'){
+    const name = document.getElementById('edit-inp-name').value.trim();
+    if(!name) return toast('Enter course name','error');
+    try {
+      const res = await fetch(BASE_URL+'/admin/courses/edit_course',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, name})
+      });
+      if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      toast('Course updated!','success');
+      document.getElementById('edit-modal-overlay').classList.remove('show');
+      await loadCourses(); renderAdminCourses();
+    } catch(e){ toast('Network error','error'); }
+
+  } else if(editState.type === 'batch'){
+    const name = document.getElementById('edit-inp-name').value.trim();
+    const link = document.getElementById('edit-inp-link').value.trim();
+    if(!name) return toast('Enter batch name','error');
+    if(!link||!link.startsWith('https://t.me/')) return toast('Enter valid t.me link','error');
+    try {
+      const res = await fetch(BASE_URL+'/admin/courses/edit_batch',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link})
+      });
+      if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      toast('Batch updated!','success');
+      document.getElementById('edit-modal-overlay').classList.remove('show');
+      await loadCourses(); renderAdminCourses();
+    } catch(e){ toast('Network error','error'); }
+  }
 }
 
 // ── Toast ─────────────────────────────────────────────────────
