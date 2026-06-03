@@ -585,19 +585,9 @@ function closePopupOnBg(e){
 }
 
 // ── Join → Open batch link ────────────────────────────────────
-function joinBatch(){
-  if(!activeBatch) return;
-  const btn = document.getElementById('join-btn');
-
-  btn.classList.add('sent');
-  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M20 6L9 17l-5-5"/></svg> Opening…`;
-
-  const link = activeBatch.link;
-  
+function openBatchLink(link){
   try {
     if(tg){
-      // t.me links — openTelegramLink opens inside Telegram
       if(link.includes('t.me/') || link.includes('telegram.me/')){
         tg.openTelegramLink(link);
       } else {
@@ -607,23 +597,36 @@ function joinBatch(){
       window.open(link, '_blank');
     }
   } catch(err){
-    // Fallback
     window.open(link, '_blank');
   }
+}
+
+function joinBatch(){
+  if(!activeBatch) return;
+  const btn = document.getElementById('join-btn');
+  btn.classList.add('sent');
+  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M20 6L9 17l-5-5"/></svg> Opening…`;
+
+  const link = activeBatch.link;
 
   // Show info message
   showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
 
-  // Monetag Rewarded Popup
+  // Pehle ad dikhao, uske baad link kholo
   if (isAdSDKAvailable()) {
     show_10391340('pop').then(() => {
-      // user watched ad
+      openBatchLink(link);
+      setTimeout(()=>{ closePopup(); }, 500);
     }).catch(e => {
-      // error during ad
+      openBatchLink(link);
+      setTimeout(()=>{ closePopup(); }, 500);
     });
+  } else {
+    // SDK nahi hai to seedha open karo
+    openBatchLink(link);
+    setTimeout(()=>{ closePopup(); }, 800);
   }
-
-  setTimeout(()=>{ closePopup(); }, 800);
 }
 
 // ── Info Message ──────────────────────────────────────────────
