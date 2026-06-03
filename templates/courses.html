@@ -488,9 +488,9 @@ const BASE_URL = "{{ base_url }}";
 function isAdSDKAvailable() {
     return typeof show_10391340 === "function";
 }
-const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+let IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 const USER_ID  = {{ user_id }};
-const ADMIN_ID_VAL = {{ user_id if is_admin else 0 }};
+let ADMIN_ID_VAL = {{ user_id if is_admin else 0 }};
 
 let allCourses = [];
 let activeCourse = null;
@@ -512,6 +512,8 @@ if(tg){
         const tgUserId = userObj.id;
         const adminId = parseInt("{{ admin_id }}");
         if(tgUserId && adminId && tgUserId === adminId){
+          ADMIN_ID_VAL = adminId;
+          IS_ADMIN = true;
           document.getElementById('admin-btn').style.display = 'flex';
         }
       }
