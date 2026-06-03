@@ -812,6 +812,7 @@ async def refresh_all_channel_photos(bot):
 
 # --- Telegram Bot Logic ---
 telegram_bot_app = Application.builder().token(os.environ.get("TELEGRAM_TOKEN")).build()
+broadcast_cancel_event = asyncio.Event()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles the /start command."""
@@ -974,11 +975,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await handle_broadcast_confirmation(update, context)
     
     elif query.data == "cancel_broadcast":
-        # If broadcast is running, set cancel flag; else just cancel confirmation
-        if context.user_data.get("broadcast_cancelled") is False:
-            context.user_data["broadcast_cancelled"] = True
-            await query.answer("⛔ Stopping broadcast...", show_alert=False)
+        if broadcast_cancel_event.is_set() is False and context.user_data.get("broadcast_running", False):
+            # Broadcast is running - signal it to stop
+            broadcast_cancel_event.set()
+            await query.answer("⛔ Stopping broadcast...", show_alert=True)
         else:
+            # Before broadcast started - just cancel confirmation
             await query.message.edit_text("❌ *Broadcast Cancelled*", parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
     
     elif query.data.startswith("revoke_"):
@@ -1317,7 +1319,9 @@ async def handle_broadcast_confirmation(update: Update, context: ContextTypes.DE
     forward_msg = context.user_data.get("broadcast_forward", False)
     message_to_broadcast = context.user_data.get("broadcast_message")
 
-    context.user_data["broadcast_cancelled"] = False
+    # Reset and arm the cancel event
+    broadcast_cancel_event.clear()
+    context.user_data["broadcast_running"] = True
 
     cancel_keyboard = [[InlineKeyboardButton(
         "⛔ Stop Broadcast",
@@ -1338,7 +1342,7 @@ async def handle_broadcast_confirmation(update: Update, context: ContextTypes.DE
     pinned = 0
 
     for user in users:
-        if context.user_data.get("broadcast_cancelled", False):
+        if broadcast_cancel_event.is_set():
             break
         try:
             if forward_msg:
@@ -1367,7 +1371,8 @@ async def handle_broadcast_confirmation(update: Update, context: ContextTypes.DE
             logger.error(f"Failed: {user['user_id']}: {e}")
             failed += 1
 
-    was_cancelled = context.user_data.get("broadcast_cancelled", False)
+    was_cancelled = broadcast_cancel_event.is_set()
+    context.user_data["broadcast_running"] = False
 
     broadcast_collection.insert_one({
         "admin_id": query.from_user.id,
