@@ -1985,21 +1985,22 @@ async def api_courses():
     return courses
 
 @app.get("/courses")
-async def courses_page(request: Request):
-    """Courses page - admin verified via JS initData check."""
+async def courses_page(request: Request, admin_id: Optional[int] = None):
+    """Courses page - admin verified via admin_id query param."""
     courses = list(courses_collection.find({}, {"_id": 1, "name": 1, "batches": 1, "order": 1}).sort("order", 1))
     for course in courses:
         course["id"] = str(course["_id"])
 
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "")
     owner_id = int(os.environ.get("ADMIN_ID", 0))
+    is_admin = (admin_id is not None and admin_id == owner_id)
 
     return templates.TemplateResponse("courses.html", {
         "request": request,
         "courses": courses,
         "base_url": base_url,
-        "user_id": 0,
-        "is_admin": False,
+        "user_id": admin_id if is_admin else 0,
+        "is_admin": is_admin,
         "admin_id": owner_id,
         "ads_enabled": True
     })
