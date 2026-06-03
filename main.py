@@ -844,7 +844,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             keyboard = [[InlineKeyboardButton(
                 "🔗 Join Group",
                 web_app=WebAppInfo(url=web_app_url),
-                style='primary'
+                style='primary'  # blue
             )]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -895,7 +895,7 @@ I help you keep your channel links safe & secure.
                     row_buttons.append(InlineKeyboardButton(
                         button_text,
                         url=ch["invite_link"],
-                style='primary'
+                        style='primary'  # blue
                     ))
             if row_buttons:
                 keyboard.append(row_buttons)
@@ -905,18 +905,20 @@ I help you keep your channel links safe & secure.
         InlineKeyboardButton(
             "📺 Tutorial",
             url="https://t.me/team_secret_tutorial_video/5",
-                style='primary'),
+            style='primary'
+        ),
         InlineKeyboardButton(
             "📞 Contact",
             url="https://t.me/team_secret_cont_bot",
-                style='primary')
+            style='primary'
+        )
     ])
     
     # Add create link button (green success)
     keyboard.append([InlineKeyboardButton(
         "🚀 Create Protected Link",
         callback_data="create_link",
-                style='success'
+        style='success'  # green
     )])
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
@@ -1014,23 +1016,25 @@ async def protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             InlineKeyboardButton(
                 "📤 Share",
                 url=f"https://t.me/share/url?url={protected_link}&text=🔐 Protected Link - Join via secure invitation",
-                style='primary'
+                style='primary'  # blue
             ),
             InlineKeyboardButton(
                 "❌ Revoke",
                 callback_data=f"revoke_{encoded_id}",
-                style='danger'
+                style='danger'  # red
             )
         ],
         [
             InlineKeyboardButton(
                 "📺 Tutorial",
                 url="https://t.me/team_secret_tutorial_video/5",
-                style='primary'),
+                style='primary'
+            ),
             InlineKeyboardButton(
                 "📞 Contact",
                 url="https://t.me/team_secret_cont_bot",
-                style='primary')
+                style='primary'
+            )
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1089,7 +1093,7 @@ async def revoke_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             keyboard.append([InlineKeyboardButton(
                 f"❌ Revoke {short_id}",
                 callback_data=f"revoke_{link['_id']}",
-                style='danger'
+                style='danger'  # red
             )])
         
         # Add tutorial and contact buttons (blue primary)
@@ -1097,11 +1101,13 @@ async def revoke_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             InlineKeyboardButton(
                 "📺 Tutorial",
                 url="https://t.me/team_secret_tutorial_video/5",
-                style='primary'),
+                style='primary'
+            ),
             InlineKeyboardButton(
                 "📞 Contact",
                 url="https://t.me/team_secret_cont_bot",
-                style='primary')
+                style='primary'
+            )
         ])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1236,14 +1242,14 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             InlineKeyboardButton(
                 "✅ Confirm Broadcast",
                 callback_data="confirm_broadcast",
-                style='success'
+                style='success'  # green
             )
         ],
         [
             InlineKeyboardButton(
                 "❌ Cancel",
                 callback_data="cancel_broadcast",
-                style='danger'
+                style='danger'  # red
             )
         ]
     ]
@@ -1395,7 +1401,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     row_buttons.append(InlineKeyboardButton(
                         button_text,
                         url=ch["invite_link"],
-                style='primary'))
+                        style='primary'
+                    ))
             if row_buttons:
                 keyboard.append(row_buttons)
     
@@ -1404,11 +1411,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         InlineKeyboardButton(
             "📺 Tutorial",
             url="https://t.me/team_secret_tutorial_video/5",
-                style='primary'),
+            style='primary'
+        ),
         InlineKeyboardButton(
             "📞 Contact",
             url="https://t.me/team_secret_cont_bot",
-                style='primary')
+            style='primary'
+        )
     ])
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
