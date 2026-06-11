@@ -2151,12 +2151,16 @@ async def edit_batch(request: Request):
     if not course_id or not batch_id or not batch_name or not batch_link:
         raise HTTPException(status_code=400, detail="course_id, batch_id, batch_name, batch_link required")
 
+    update_fields = {
+        "batches.$.name": batch_name,
+        "batches.$.link": batch_link
+    }
+    if "batch_pic" in data:
+        update_fields["batches.$.pic"] = data["batch_pic"]
+
     courses_collection.update_one(
         {"_id": ObjectId(course_id), "batches.id": batch_id},
-        {"$set": {
-            "batches.$.name": batch_name,
-            "batches.$.link": batch_link
-        }}
+        {"$set": update_fields}
     )
     return {"status": "ok"}
 
