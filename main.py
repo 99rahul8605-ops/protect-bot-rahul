@@ -1764,7 +1764,9 @@ async def telegram_webhook(request: Request, token: str):
     
     update_data = await request.json()
     update = Update.de_json(update_data, telegram_bot_app.bot)
-    await telegram_bot_app.process_update(update)
+    
+    # Fire and forget — return 200 immediately so Telegram doesn't retry old requests
+    asyncio.create_task(telegram_bot_app.process_update(update))
     
     return Response(status_code=200)
 
