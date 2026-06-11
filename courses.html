@@ -559,14 +559,30 @@ function goAdmin(){
 
 // ── Load Courses ──────────────────────────────────────────────
 async function loadCourses(){
+  // Cache-first: instantly render from localStorage if available
+  const CACHE_KEY = 'ts_courses_cache';
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if(cached){
+      allCourses = JSON.parse(cached);
+      renderCoursesList();
+      if(IS_ADMIN) renderAdminCourses();
+    }
+  } catch(e){}
+
+  // Then fetch fresh data in background
   try {
     const res = await fetch(BASE_URL + '/api/courses');
-    allCourses = await res.json();
+    const fresh = await res.json();
+    localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+    allCourses = fresh;
     renderCoursesList();
     if(IS_ADMIN) renderAdminCourses();
   } catch(e){
-    document.getElementById('courses-list').innerHTML =
-      '<div class="empty"><p>Failed to load courses.</p></div>';
+    if(!allCourses.length){
+      document.getElementById('courses-list').innerHTML =
+        '<div class="empty"><p>Failed to load courses.</p></div>';
+    }
   }
 }
 
@@ -892,6 +908,7 @@ async function addCourse(){
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
     document.getElementById('newCourseName').value='';
+    clearCoursesCache();
     toast('Course added!','success');
     await loadCourses();
     renderAdminCourses();
@@ -907,6 +924,7 @@ async function deleteCourse(courseId, name){
       body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId})
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+    clearCoursesCache();
     toast('Deleted','success');
     await loadCourses();
     renderAdminCourses();
@@ -950,6 +968,7 @@ async function addBatch(courseId){
     fileInput.value='';
     document.getElementById('pp-'+courseId).style.display='none';
     document.getElementById('fpl-'+courseId).textContent='Pic (optional)';
+    clearCoursesCache();
     toast('Batch added!','success');
     await loadCourses();
     renderAdminCourses();
@@ -1038,6 +1057,7 @@ async function saveEdit(){
         body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, name})
       });
       if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      clearCoursesCache();
       toast('Course updated!','success');
       document.getElementById('edit-modal-overlay').classList.remove('show');
       await loadCourses(); renderAdminCourses();
@@ -1070,6 +1090,7 @@ async function saveEdit(){
         body: JSON.stringify(body)
       });
       if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      clearCoursesCache();
       toast('Batch updated!','success');
       document.getElementById('edit-modal-overlay').classList.remove('show');
       await loadCourses(); renderAdminCourses();
@@ -1086,6 +1107,7 @@ function toast(msg, type='success'){
 
 // ── Utils ─────────────────────────────────────────────────────
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function clearCoursesCache(){ try{ localStorage.removeItem('ts_courses_cache'); }catch(e){} }
 </script>
 </body>
 </html>
