@@ -293,6 +293,9 @@ body{
   border-radius:var(--radius);margin-bottom:14px;overflow:hidden;
   animation:fadeUp .35s ease both;
 }
+/* Admin add-batch form grid - tighter */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+@media(max-width:400px){.form-grid{grid-template-columns:1fr;}}
 .admin-course-head{
   display:flex;align-items:center;gap:10px;
   padding:14px 16px;border-bottom:1px solid var(--border);
@@ -304,12 +307,14 @@ body{
 
 .admin-batches{padding:10px 16px 4px;}
 .admin-batch-row{
-  display:flex;align-items:center;gap:10px;
+  display:grid;
+  grid-template-columns:48px 1fr auto auto;
+  align-items:center;gap:10px;
   padding:8px 10px;border-radius:10px;margin-bottom:6px;
   background:rgba(255,255,255,.03);border:1px solid var(--border);
 }
 .admin-batch-thumb{
-  width:38px;height:38px;border-radius:8px;flex-shrink:0;
+  width:48px;height:36px;border-radius:8px;flex-shrink:0;
   object-fit:cover;background:rgba(124,92,252,.15);
   display:flex;align-items:center;justify-content:center;overflow:hidden;
 }
@@ -325,9 +330,7 @@ body{
 
 .add-batch-area{padding:10px 16px 16px;border-top:1px solid var(--border);
   background:rgba(255,255,255,.01);}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
-@media(max-width:400px){.form-grid{grid-template-columns:1fr;}}
-.file-label{
+.add-batch-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;}
   display:flex;align-items:center;gap:8px;
   background:rgba(255,255,255,.04);border:1px dashed var(--border2);
   color:var(--muted);font-size:12px;padding:9px 12px;
@@ -556,14 +559,30 @@ function goAdmin(){
 
 // ── Load Courses ──────────────────────────────────────────────
 async function loadCourses(){
+  // Cache-first: instantly render from localStorage if available
+  const CACHE_KEY = 'ts_courses_cache';
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if(cached){
+      allCourses = JSON.parse(cached);
+      renderCoursesList();
+      if(IS_ADMIN) renderAdminCourses();
+    }
+  } catch(e){}
+
+  // Then fetch fresh data in background
   try {
     const res = await fetch(BASE_URL + '/api/courses');
-    allCourses = await res.json();
+    const fresh = await res.json();
+    localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+    allCourses = fresh;
     renderCoursesList();
     if(IS_ADMIN) renderAdminCourses();
   } catch(e){
-    document.getElementById('courses-list').innerHTML =
-      '<div class="empty"><p>Failed to load courses.</p></div>';
+    if(!allCourses.length){
+      document.getElementById('courses-list').innerHTML =
+        '<div class="empty"><p>Failed to load courses.</p></div>';
+    }
   }
 }
 
@@ -841,7 +860,7 @@ function renderAdminCourses(){
                 <div class="bname">${escHtml(b.name)}</div>
                 <div class="blink">${escHtml(b.link)}</div>
               </div>
-              <button class="edit-btn" style="margin-right:4px;" onclick="editBatch('${c.id}','${b.id}','${escHtml(b.name)}','${escHtml(b.link)}')">
+              <button class="edit-btn" style="margin-right:4px;" onclick="editBatch('${c.id}','${b.id}','${escHtml(b.name)}','${escHtml(b.link)}',${b.pic?`'${escHtml(b.pic)}'`:'null'})">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
               <button class="del-btn" onclick="deleteBatch('${c.id}','${b.id}')">
@@ -889,6 +908,7 @@ async function addCourse(){
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
     document.getElementById('newCourseName').value='';
+    clearCoursesCache();
     toast('Course added!','success');
     await loadCourses();
     renderAdminCourses();
@@ -904,6 +924,7 @@ async function deleteCourse(courseId, name){
       body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId})
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+    clearCoursesCache();
     toast('Deleted','success');
     await loadCourses();
     renderAdminCourses();
@@ -947,6 +968,7 @@ async function addBatch(courseId){
     fileInput.value='';
     document.getElementById('pp-'+courseId).style.display='none';
     document.getElementById('fpl-'+courseId).textContent='Pic (optional)';
+    clearCoursesCache();
     toast('Batch added!','success');
     await loadCourses();
     renderAdminCourses();
@@ -981,15 +1003,42 @@ function editCourse(courseId, name){
   setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
 }
 
-function editBatch(courseId, batchId, name, link){
+function editBatch(courseId, batchId, name, link, picSrc){
   editState = { type:'batch', courseId, batchId };
   document.getElementById('edit-modal-title').textContent = 'Edit Batch';
   document.getElementById('edit-modal-body').innerHTML = `
-    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Batch name" autocomplete="off"/>
-    <input class="inp" id="edit-inp-link" type="text" value="${link}" placeholder="https://t.me/..." autocomplete="off"/>
+    <input class="inp" id="edit-inp-name" type="text" value="${name}" placeholder="Batch name" autocomplete="off" style="margin-bottom:10px;"/>
+    <input class="inp" id="edit-inp-link" type="text" value="${link}" placeholder="https://t.me/..." autocomplete="off" style="margin-bottom:10px;"/>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label class="file-label" for="edit-inp-pic" style="flex:1;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+        </svg>
+        <span id="edit-fpl">Change Pic</span>
+        <input type="file" id="edit-inp-pic" accept="image/*" onchange="editPreviewPic(this)"/>
+      </label>
+      <img id="edit-pic-preview" src="${picSrc||''}" alt=""
+        style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--border2);${picSrc?'':'display:none'}"/>
+    </div>
+    ${picSrc ? `<div style="margin-top:8px;"><label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
+      <input type="checkbox" id="edit-remove-pic" style="accent-color:var(--red);"/> Remove current pic
+    </label></div>` : ''}
   `;
   document.getElementById('edit-modal-overlay').classList.add('show');
   setTimeout(()=>document.getElementById('edit-inp-name').focus(), 100);
+}
+
+function editPreviewPic(input){
+  const file = input.files[0];
+  const preview = document.getElementById('edit-pic-preview');
+  const label = document.getElementById('edit-fpl');
+  if(!file){ preview.style.display='none'; return; }
+  if(file.size > 1048576){ toast('Max 1MB','error'); input.value=''; return; }
+  label.textContent = file.name.length>16 ? file.name.slice(0,16)+'…' : file.name;
+  const r = new FileReader();
+  r.onload = e => { preview.src=e.target.result; preview.style.display='block'; };
+  r.readAsDataURL(file);
 }
 
 function closeEditModal(e){
@@ -1008,6 +1057,7 @@ async function saveEdit(){
         body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, name})
       });
       if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      clearCoursesCache();
       toast('Course updated!','success');
       document.getElementById('edit-modal-overlay').classList.remove('show');
       await loadCourses(); renderAdminCourses();
@@ -1018,12 +1068,29 @@ async function saveEdit(){
     const link = document.getElementById('edit-inp-link').value.trim();
     if(!name) return toast('Enter batch name','error');
     if(!link||!link.startsWith('https://t.me/')) return toast('Enter valid t.me link','error');
+
+    const fileInput = document.getElementById('edit-inp-pic');
+    const removePic = document.getElementById('edit-remove-pic')?.checked || false;
+    let picPayload = undefined; // undefined = no change
+
+    if(removePic){
+      picPayload = ''; // clear pic
+    } else if(fileInput && fileInput.files[0]){
+      picPayload = await new Promise(res=>{
+        const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(fileInput.files[0]);
+      });
+    }
+
+    const body = {admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link};
+    if(picPayload !== undefined) body.batch_pic = picPayload;
+
     try {
       const res = await fetch(BASE_URL+'/admin/courses/edit_batch',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link})
+        body: JSON.stringify(body)
       });
       if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
+      clearCoursesCache();
       toast('Batch updated!','success');
       document.getElementById('edit-modal-overlay').classList.remove('show');
       await loadCourses(); renderAdminCourses();
@@ -1040,6 +1107,7 @@ function toast(msg, type='success'){
 
 // ── Utils ─────────────────────────────────────────────────────
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function clearCoursesCache(){ try{ localStorage.removeItem('ts_courses_cache'); }catch(e){} }
 </script>
 </body>
 </html>
