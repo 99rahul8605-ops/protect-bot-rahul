@@ -1698,7 +1698,7 @@ async def on_startup():
     await telegram_bot_app.start()
     
     webhook_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/{os.environ.get('TELEGRAM_TOKEN')}"
-    await telegram_bot_app.bot.set_webhook(url=webhook_url)
+    await telegram_bot_app.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
     logger.info(f"Webhook: {webhook_url}")
     
     bot_info = await telegram_bot_app.bot.get_me()
