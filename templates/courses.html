@@ -559,46 +559,16 @@ function goAdmin(){
 
 // ── Load Courses ──────────────────────────────────────────────
 async function loadCourses(){
-  // Cache-first: instantly render from localStorage if available
-  const CACHE_KEY = 'ts_courses_cache';
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if(cached){
-      const parsedCache = JSON.parse(cached);
-      // Placeholder pics ko blank kar do (actual pics fresh fetch se aayenge)
-      allCourses = parsedCache.map(c => ({
-        ...c,
-        batches: c.batches.map(b => ({...b, pic: b.pic === '__has_pic__' ? '' : b.pic}))
-      }));
-      renderCoursesList();
-      if(IS_ADMIN) renderAdminCourses();
-    }
-  } catch(e){ localStorage.removeItem(CACHE_KEY); }
-
-  // Then fetch fresh data in background
+  // LocalStorage bilkul nahi — seedha MongoDB se fresh data fetch
   try {
     const res = await fetch(BASE_URL + '/api/courses');
-    const fresh = await res.json();
-    allCourses = fresh;
+    if(!res.ok) throw new Error('Server error: ' + res.status);
+    allCourses = await res.json();
     renderCoursesList();
     if(IS_ADMIN) renderAdminCourses();
-    // Cache mein base64 pics store mat karo — localStorage quota overflow hoga
-    // Sirf lightweight data cache karo (pics exclude)
-    try {
-      const cacheData = fresh.map(c => ({
-        ...c,
-        batches: c.batches.map(b => ({...b, pic: b.pic ? '__has_pic__' : ''}))
-      }));
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-    } catch(cacheErr) {
-      // Cache fail ho toh koi baat nahi — fresh data already render ho gaya
-      localStorage.removeItem(CACHE_KEY);
-    }
   } catch(e){
-    if(!allCourses.length){
-      document.getElementById('courses-list').innerHTML =
-        '<div class="empty"><p>Failed to load courses.</p></div>';
-    }
+    document.getElementById('courses-list').innerHTML =
+      '<div class="empty"><p>Failed to load courses. Please try again.</p></div>';
   }
 }
 
@@ -1123,9 +1093,7 @@ function toast(msg, type='success'){
 
 // ── Utils ─────────────────────────────────────────────────────
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function clearCoursesCache(){
-  try{ localStorage.removeItem('ts_courses_cache'); }catch(e){}
-}
+function clearCoursesCache(){ /* localStorage removed — MongoDB se fresh data aata hai */ }
 </script>
 </body>
 </html>
