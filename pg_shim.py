@@ -229,7 +229,7 @@ class _Pool:
     @classmethod
     def init(cls, dsn: str):
         if cls._pool is None:
-            cls._pool = pg_pool.ThreadedConnectionPool(1, 10, dsn=dsn)
+            cls._pool = pg_pool.ThreadedConnectionPool(2, 25, dsn=dsn)
 
     @classmethod
     def getconn(cls):
@@ -257,6 +257,20 @@ class _ConnCtx:
 # ---------------------------------------------------------------------------
 # Collection (pymongo-compatible subset)
 # ---------------------------------------------------------------------------
+
+class _FastUpsertSupport:
+    """Cache karta hai kis (table, field) pe unique index-based single-query
+    upsert kaam karta hai, taaki baar baar failing attempt na ho."""
+    _status: Dict[tuple, bool] = {}
+
+    @classmethod
+    def works(cls, key) -> Optional[bool]:
+        return cls._status.get(key)
+
+    @classmethod
+    def mark_unsupported(cls, key):
+        cls._status[key] = False
+
 
 class PGCollection:
     def __init__(self, db_name: str, coll_name: str):
@@ -370,7 +384,17 @@ class PGCollection:
     def find(self, filter: Optional[dict] = None, projection: Optional[dict] = None,
               sort=None, limit: Optional[int] = None) -> _Cursor:
         filt = filter or {}
-        docs = [d for d in self._fetch_all() if _matches(d, filt)]
+        simple_keys = [
+            k for k, v in filt.items()
+            if k not in ("$or", "$and") and "." not in k and not isinstance(v, dict)
+        ]
+        if simple_keys:
+            # Sabse selective lagne wale field se pehle DB-level filter, phir baaki Python me
+            field = simple_keys[0]
+            base_docs = self._fetch_by_field(field, filt[field])
+        else:
+            base_docs = self._fetch_all()
+        docs = [d for d in base_docs if _matches(d, filt)]
         cur = _Cursor(docs)
         if sort:
             cur.sort(sort)
@@ -398,6 +422,28 @@ class PGCollection:
 
     def update_one(self, filter: dict, update: dict, upsert: bool = False):
         filt = filter or {}
+
+        # Fast path: single simple-field filter + pure $set + upsert => ek hi
+        # DB round-trip me atomic UPSERT (bajaye read-then-write ke). Ye sabse
+        # common pattern hai (e.g. users_collection.update_one({"user_id": ...}))
+        # aur agar us field pe unique index hai (create_index se), to
+        # single-query ON CONFLICT use hota hai; warna automatically slow
+        # (read-modify-write) path pe fallback ho jaata hai.
+        if (
+            upsert
+            and set(update.keys()) <= {"$set"}
+            and len(filt) == 1
+        ):
+            (field, value), = filt.items()
+            if "." not in field and not isinstance(value, dict) and field != "_id":
+                fast_key = (self.table, field)
+                if _FastUpsertSupport.works(fast_key) is not False:
+                    try:
+                        return self._fast_upsert_by_field(field, value, update.get("$set", {}))
+                    except Exception:
+                        _FastUpsertSupport.mark_unsupported(fast_key)
+                        # gracefully fall through to slow (correct) path below
+
         doc = self.find_one(filt)
         if doc is None:
             if upsert:
@@ -415,6 +461,25 @@ class PGCollection:
         positional_index = _find_positional_index(doc, filt)
         new_doc = _apply_update_ops(doc, update, positional_index)
         self._upsert_doc(new_doc)
+        return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
+
+    def _fast_upsert_by_field(self, field: str, value, set_fields: dict):
+        """Single round-trip atomic upsert, requires a unique index on (data->>field)."""
+        new_id = str(ObjectId())
+        base_doc = dict(set_fields)
+        base_doc[field] = value
+        base_doc["_id"] = new_id
+        insert_json = json_util.dumps(base_doc)
+        set_json = json_util.dumps(set_fields)
+        with _ConnCtx() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f'INSERT INTO "{self.table}" (id, data) VALUES (%s, %s::jsonb) '
+                    f'ON CONFLICT ((data->>%s)) DO UPDATE SET '
+                    f'data = "{self.table}".data || %s::jsonb',
+                    (new_id, insert_json, field, set_json),
+                )
+            conn.commit()
         return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
 
     def delete_one(self, filter: dict):
