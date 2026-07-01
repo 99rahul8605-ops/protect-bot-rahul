@@ -7,7 +7,7 @@ import datetime
 import io
 import requests
 from typing import Optional, List, Dict, Any
-from pymongo import MongoClient
+from pg_shim import PGClient as MongoClient
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse, HTMLResponse
@@ -24,13 +24,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Database Setup (MongoDB) ---
-MONGODB_URI = os.environ.get("MONGODB_URI")
-if not MONGODB_URI:
-    raise Exception("MONGODB_URI environment variable not set!")
+# --- Database Setup (PostgreSQL, MongoDB-compatible shim) ---
+DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("PG_URI")
+if not DATABASE_URL:
+    raise Exception("DATABASE_URL (ya PG_URI) environment variable not set!")
 
-# Initialize MongoDB client and select database/collection
-client = MongoClient(MONGODB_URI)
+# Initialize Postgres-backed client and select database/collection
+client = MongoClient(DATABASE_URL)
 db_name = "protected_bot_db"
 db = client[db_name]
 links_collection = db["protected_links"]
@@ -43,10 +43,10 @@ ad_impressions_collection = db["ad_impressions"]
 courses_collection = db["courses"]
 
 def init_db():
-    """Verifies the MongoDB connection."""
+    """Verifies the PostgreSQL connection."""
     try:
         client.admin.command('ismaster')
-        logger.info("✅ MongoDB connected")
+        logger.info("✅ PostgreSQL connected")
         
         # Create indexes
         users_collection.create_index("user_id", unique=True)
@@ -58,7 +58,7 @@ def init_db():
         ad_impressions_collection.create_index("ad_type")
         logger.info("✅ Database indexes created")
     except Exception as e:
-        logger.error(f"❌ MongoDB error: {e}")
+        logger.error(f"❌ PostgreSQL error: {e}")
         raise
 
 def is_maintenance_mode() -> bool:
@@ -1774,7 +1774,7 @@ async def telegram_webhook(request: Request, token: str):
 async def health_check():
     """Lightweight health check for uptime monitoring (plain text)."""
     try:
-        # Quick MongoDB ping
+        # Quick PostgreSQL ping
         client.admin.command('ismaster')
         return Response(content="OK", status_code=200, media_type="text/plain")
     except Exception as e:
