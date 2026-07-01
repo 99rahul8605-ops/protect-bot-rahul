@@ -8,6 +8,7 @@ import io
 import requests
 from typing import Optional, List, Dict, Any
 from pg_shim import PGClient as MongoClient
+from bson import ObjectId
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse, HTMLResponse
@@ -41,6 +42,29 @@ channels_collection = db["channels"]
 # Add ad tracking collection
 ad_impressions_collection = db["ad_impressions"]
 courses_collection = db["courses"]
+media_collection = db["media"]  # batch/course images yahan alag store hoti hain
+
+
+def save_image_and_get_url(data_uri: str) -> str:
+    """
+    Base64 data-URI (e.g. 'data:image/png;base64,....') ko alag 'media'
+    collection me save karta hai aur ek chhota-sa /media/<id> URL return
+    karta hai. Isse course/batch document ke andar bada base64 blob
+    embed nahi hota — fetch/save dono fast rehte hain.
+    Khaali ya invalid input pe khaali string return karta hai (no image).
+    """
+    if not data_uri or not data_uri.startswith("data:"):
+        return data_uri or ""
+    try:
+        header, b64data = data_uri.split(",", 1)
+        mime = header.split(":", 1)[1].split(";", 1)[0] if ":" in header else "image/jpeg"
+    except Exception:
+        return ""
+
+    image_id = str(ObjectId())
+    media_collection.insert_one({"_id": image_id, "mime": mime, "data": b64data})
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
+    return f"{base_url}/media/{image_id}"
 
 def init_db():
     """Verifies the PostgreSQL connection."""
@@ -1864,6 +1888,24 @@ async def check_membership_api(token: str, user_id: int):
         "contact_bot": "https://t.me/team_secret_cont_bot"
     }
 
+@app.get("/media/{image_id}")
+async def get_media_image(image_id: str):
+    """Batch/course images ko base64 store se serve karta hai (Cache-Control ke saath)."""
+    import base64 as b64
+    doc = media_collection.find_one({"_id": image_id})
+    if not doc or not doc.get("data"):
+        raise HTTPException(status_code=404, detail="Image not found")
+    try:
+        image_bytes = b64.b64decode(doc["data"])
+    except Exception:
+        raise HTTPException(status_code=500, detail="Corrupt image data")
+    return StreamingResponse(
+        io.BytesIO(image_bytes),
+        media_type=doc.get("mime", "image/jpeg"),
+        headers={"Cache-Control": "public, max-age=604800"}
+    )
+
+
 @app.get("/channel_photo/{channel_id}")
 async def get_channel_photo(channel_id: str):
     """Proxy endpoint to serve channel photos."""
@@ -2071,7 +2113,7 @@ async def add_batch(request: Request):
         "id": str(ObjectId()),
         "name": batch_name,
         "link": batch_link,
-        "pic": batch_pic  # base64 string or ""
+        "pic": save_image_and_get_url(batch_pic)  # ab sirf ek chhota URL store hota hai
     }
     
     courses_collection.update_one(
@@ -2156,7 +2198,7 @@ async def edit_batch(request: Request):
         "batches.$.link": batch_link
     }
     if "batch_pic" in data:
-        update_fields["batches.$.pic"] = data["batch_pic"]
+        update_fields["batches.$.pic"] = save_image_and_get_url(data["batch_pic"])
 
     courses_collection.update_one(
         {"_id": ObjectId(course_id), "batches.id": batch_id},
