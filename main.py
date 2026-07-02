@@ -63,8 +63,9 @@ def save_image_and_get_url(data_uri: str) -> str:
 
     image_id = str(ObjectId())
     media_collection.insert_one({"_id": image_id, "mime": mime, "data": b64data})
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
-    return f"{base_url}/media/{image_id}"
+    # Relative path store karte hain (poora domain nahi) — isse agar Render
+    # ka domain/service kabhi change ho, purani images ke links nahi tootenge.
+    return f"/media/{image_id}"
 
 def init_db():
     """Verifies the PostgreSQL connection."""
