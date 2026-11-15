@@ -345,17 +345,9 @@ class PGCollection:
     # -- public pymongo-like API --------------------------------------------
 
     def public_course_catalog(self, include_links: bool = False) -> List[dict]:
-        """Get a small public course catalog directly from PostgreSQL.
-
-        Crucially, never send full course documents (legacy base64 pictures and
-        private links) from PostgreSQL to Python just to project them away.
-        This is intentionally specific to the courses collection.
-        """
+        """Return compact catalog without inline Base64 images or public links."""
         import json
-        # Only the authenticated admin API sets this flag. The public
-        # endpoint never receives the saved Telegram invite URL.
-        link_fragment = ", 'link', COALESCE(item.value->>'link', '')" if include_links else ""
-        query = f"""
+        query = """
             SELECT t.id,
                    COALESCE(t.data->>'name', ''),
                    COALESCE(t.data->>'order', '0'),
@@ -369,8 +361,12 @@ class PGCollection:
                                    THEN '/course-image/' || t.id || '/' || COALESCE(item.value->>'id', '')
                                    ELSE COALESCE(item.value->>'pic', '')
                                END
-                               {link_fragment}
-                           ) ORDER BY item.ordinality
+                           ) ||
+                           CASE WHEN %s
+                               THEN jsonb_build_object('link', COALESCE(item.value->>'link', ''))
+                               ELSE '{}'::jsonb
+                           END
+                           ORDER BY item.ordinality
                        )
                        FROM jsonb_array_elements(
                            CASE
@@ -380,269 +376,23 @@ class PGCollection:
                            END
                        ) WITH ORDINALITY AS item(value, ordinality)
                    ), '[]'::jsonb)::text
-            FROM "{self.table}" AS t
+            FROM "__COURSES_TABLE__" AS t
             ORDER BY CASE
-                WHEN (t.data->>'order') ~ '^[0-9]+
-        filt = dict(filter or {})
-
-        if "_id" in filt and not isinstance(filt["_id"], dict):
-            target_id = str(filt["_id"])
-            with _ConnCtx() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        f'SELECT id, data::text FROM "{self.table}" WHERE id = %s', (target_id,)
-                    )
-                    row = cur.fetchone()
-            if not row:
-                return None
-            doc = json_util.loads(row[1])
-            doc["_id"] = row[0]
-            rest = {k: v for k, v in filt.items() if k != "_id"}
-            if rest and not _matches(doc, rest):
-                return None
-            return self._apply_projection(doc, projection)
-
-        simple_keys = [
-            k for k, v in filt.items()
-            if k not in ("$or", "$and") and "." not in k and not isinstance(v, dict)
-        ]
-        if simple_keys:
-            field = simple_keys[0]
-            candidates = self._fetch_by_field(field, filt[field])
-            for doc in candidates:
-                if _matches(doc, filt):
-                    return self._apply_projection(doc, projection)
-            return None
-
-        for doc in self._fetch_all():
-            if _matches(doc, filt):
-                return self._apply_projection(doc, projection)
-        return None
-
-    def find(self, filter: Optional[dict] = None, projection: Optional[dict] = None,
-              sort=None, limit: Optional[int] = None) -> _Cursor:
-        filt = filter or {}
-        simple_keys = [
-            k for k, v in filt.items()
-            if k not in ("$or", "$and") and "." not in k and not isinstance(v, dict)
-        ]
-        if simple_keys:
-            # Sabse selective lagne wale field se pehle DB-level filter, phir baaki Python me
-            field = simple_keys[0]
-            base_docs = self._fetch_by_field(field, filt[field])
-        else:
-            base_docs = self._fetch_all()
-        docs = [d for d in base_docs if _matches(d, filt)]
-        cur = _Cursor(docs)
-        if sort:
-            cur.sort(sort)
-        if limit:
-            cur.limit(limit)
-        if projection:
-            cur._docs = [self._apply_projection(d, projection) for d in cur._docs]
-        return cur
-
-    def count_documents(self, filter: Optional[dict] = None) -> int:
-        filt = filter or {}
-        if not filt:
-            with _ConnCtx() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(f'SELECT COUNT(*) FROM "{self.table}"')
-                    return cur.fetchone()[0]
-        return sum(1 for d in self._fetch_all() if _matches(d, filt))
-
-    def insert_one(self, doc: dict):
-        doc = dict(doc)
-        if not doc.get("_id"):
-            doc["_id"] = str(ObjectId())
-        doc_id = self._upsert_doc(doc)
-        return SimpleNamespace(inserted_id=doc_id)
-
-    def update_one(self, filter: dict, update: dict, upsert: bool = False):
-        filt = filter or {}
-
-        # Fast path: single simple-field filter + pure $set + upsert => ek hi
-        # DB round-trip me atomic UPSERT (bajaye read-then-write ke). Ye sabse
-        # common pattern hai (e.g. users_collection.update_one({"user_id": ...}))
-        # aur agar us field pe unique index hai (create_index se), to
-        # single-query ON CONFLICT use hota hai; warna automatically slow
-        # (read-modify-write) path pe fallback ho jaata hai.
-        if (
-            upsert
-            and set(update.keys()) <= {"$set"}
-            and len(filt) == 1
-        ):
-            (field, value), = filt.items()
-            if "." not in field and not isinstance(value, dict) and field != "_id":
-                fast_key = (self.table, field)
-                if _FastUpsertSupport.works(fast_key) is not False:
-                    try:
-                        return self._fast_upsert_by_field(field, value, update.get("$set", {}))
-                    except Exception:
-                        _FastUpsertSupport.mark_unsupported(fast_key)
-                        # gracefully fall through to slow (correct) path below
-
-        doc = self.find_one(filt)
-        if doc is None:
-            if upsert:
-                new_doc = {
-                    k: v for k, v in filt.items()
-                    if not str(k).startswith("$") and "." not in k and not isinstance(v, dict)
-                }
-                new_doc = _apply_update_ops(new_doc, update)
-                if not new_doc.get("_id"):
-                    new_doc["_id"] = str(ObjectId())
-                doc_id = self._upsert_doc(new_doc)
-                return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=doc_id)
-            return SimpleNamespace(matched_count=0, modified_count=0, upserted_id=None)
-
-        positional_index = _find_positional_index(doc, filt)
-        new_doc = _apply_update_ops(doc, update, positional_index)
-        self._upsert_doc(new_doc)
-        return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
-
-    def _fast_upsert_by_field(self, field: str, value, set_fields: dict):
-        """Single round-trip atomic upsert, requires a unique index on (data->>field)."""
-        new_id = str(ObjectId())
-        base_doc = dict(set_fields)
-        base_doc[field] = value
-        base_doc["_id"] = new_id
-        insert_json = json_util.dumps(base_doc)
-        set_json = json_util.dumps(set_fields)
-        with _ConnCtx() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f'INSERT INTO "{self.table}" (id, data) VALUES (%s, %s::jsonb) '
-                    f'ON CONFLICT ((data->>%s)) DO UPDATE SET '
-                    f'data = "{self.table}".data || %s::jsonb',
-                    (new_id, insert_json, field, set_json),
-                )
-            conn.commit()
-        return SimpleNamespace(matched_count=1, modified_count=1, upserted_id=None)
-
-    def delete_one(self, filter: dict):
-        doc = self.find_one(filter)
-        if not doc:
-            return SimpleNamespace(deleted_count=0)
-        with _ConnCtx() as conn:
-            with conn.cursor() as cur:
-                cur.execute(f'DELETE FROM "{self.table}" WHERE id = %s', (str(doc["_id"]),))
-            conn.commit()
-        return SimpleNamespace(deleted_count=1)
-
-    def create_index(self, keys, unique: bool = False):
-        try:
-            if isinstance(keys, str):
-                field = keys
-            elif isinstance(keys, list) and keys:
-                field = keys[0][0]
-            else:
-                return
-            idx_name = _sanitize(f"{self.table}_{field}_idx")
-            unique_sql = "UNIQUE " if unique else ""
-            with _ConnCtx() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        f'CREATE {unique_sql}INDEX IF NOT EXISTS "{idx_name}" '
-                        f'ON "{self.table}" ((data->>%s))',
-                        (field,),
-                    )
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"create_index skipped for {self.table}: {e}")
-
-    def aggregate(self, pipeline: List[dict]):
-        docs = self._fetch_all()
-        for stage in pipeline:
-            if "$match" in stage:
-                docs = [d for d in docs if _matches(d, stage["$match"])]
-            elif "$group" in stage:
-                group = stage["$group"]
-                id_expr = group["_id"]
-                buckets: Dict[Any, list] = {}
-                for d in docs:
-                    if id_expr is None:
-                        key = None
-                    elif isinstance(id_expr, str) and id_expr.startswith("$"):
-                        key = _get_nested(d, id_expr[1:])
-                    else:
-                        key = id_expr
-                    buckets.setdefault(key, []).append(d)
-                results = []
-                for key, items in buckets.items():
-                    row = {"_id": key}
-                    for out_field, agg_expr in group.items():
-                        if out_field == "_id":
-                            continue
-                        if isinstance(agg_expr, dict) and "$sum" in agg_expr:
-                            sum_expr = agg_expr["$sum"]
-                            if sum_expr == 1:
-                                row[out_field] = len(items)
-                            elif isinstance(sum_expr, str) and sum_expr.startswith("$"):
-                                fld = sum_expr[1:]
-                                row[out_field] = sum((_get_nested(it, fld) or 0) for it in items)
-                            else:
-                                row[out_field] = len(items)
-                    results.append(row)
-                docs = results
-            elif "$sort" in stage:
-                for k, direction in reversed(list(stage["$sort"].items())):
-                    docs.sort(key=lambda x: (x.get(k) is None, x.get(k)), reverse=(direction == -1))
-            elif "$limit" in stage:
-                docs = docs[: stage["$limit"]]
-        return docs
-
-
-# ---------------------------------------------------------------------------
-# Database / Client wrappers (mimic pymongo's client[db][collection] access)
-# ---------------------------------------------------------------------------
-
-class PGDatabase:
-    def __init__(self, db_name: str):
-        self.db_name = db_name
-        self._collections: Dict[str, PGCollection] = {}
-
-    def __getitem__(self, coll_name: str) -> PGCollection:
-        if coll_name not in self._collections:
-            self._collections[coll_name] = PGCollection(self.db_name, coll_name)
-        return self._collections[coll_name]
-
-
-class _AdminShim:
-    def command(self, cmd, *args, **kwargs):
-        with _ConnCtx() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                cur.fetchone()
-        return {"ok": 1.0}
-
-
-class PGClient:
-    """Drop-in replacement for pymongo.MongoClient, backed by PostgreSQL."""
-
-    def __init__(self, dsn: str):
-        _Pool.init(dsn)
-        self.admin = _AdminShim()
-        self._dbs: Dict[str, PGDatabase] = {}
-
-    def __getitem__(self, db_name: str) -> PGDatabase:
-        if db_name not in self._dbs:
-            self._dbs[db_name] = PGDatabase(db_name)
-        return self._dbs[db_name]
-
+                WHEN (t.data->>'order') ~ '^[0-9]+$'
                 THEN (t.data->>'order')::integer
                 ELSE 0
             END, t.id
-        """
+        """.replace("__COURSES_TABLE__", self.table)
         with _ConnCtx() as conn:
             with conn.cursor() as cur:
-                cur.execute(query)
+                cur.execute(query, (include_links,))
                 rows = cur.fetchall()
         return [
             {"id": row[0], "name": row[1], "order": row[2],
              "batches": json.loads(row[3])}
             for row in rows
         ]
+
 
     def find_one(self, filter: Optional[dict] = None, projection: Optional[dict] = None):
         filt = dict(filter or {})
