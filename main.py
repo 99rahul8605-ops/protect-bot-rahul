@@ -11,7 +11,7 @@ from pg_shim import PGClient as MongoClient
 from bson import ObjectId
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 
 # --- Telegram Imports ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, ChatMember, ChatInviteLink
@@ -1826,6 +1826,13 @@ async def readiness_check():
 async def root_head():
     """Support HEAD checks against the service root URL."""
     return Response(status_code=200)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon.svg", include_in_schema=False)
+async def favicon():
+    """Serve the Team Secret favicon for tabs and automatic browser requests."""
+    return FileResponse("static/favicon.svg", media_type="image/svg+xml")
 
 
 @app.get("/")
