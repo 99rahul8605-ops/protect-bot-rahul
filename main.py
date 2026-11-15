@@ -1797,14 +1797,24 @@ async def telegram_webhook(request: Request, token: str):
 
 @app.get("/health")
 async def health_check():
-    """Lightweight health check for uptime monitoring (plain text)."""
+    """Lightweight HTTP liveness endpoint for Render and UptimeRobot.
+
+    A temporary PostgreSQL failure must not mark the running web server down.
+    """
+    return Response(content="OK", status_code=200, media_type="text/plain")
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Database readiness, independently of HTTP liveness."""
     try:
-        # Quick PostgreSQL ping
-        client.admin.command('ismaster')
-        return Response(content="OK", status_code=200, media_type="text/plain")
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return Response(content="Database error", status_code=503, media_type="text/plain")
+        await asyncio.wait_for(
+            asyncio.to_thread(client.admin.command, "ping"), timeout=5.0
+        )
+        return Response(content="READY", status_code=200, media_type="text/plain")
+    except Exception as exc:
+        logger.warning("Database readiness check failed: %s", exc)
+        return Response(content="Database unavailable", status_code=503, media_type="text/plain")
 
 @app.get("/")
 async def root(request: Request):
