@@ -2188,10 +2188,9 @@ async def add_course(request: Request):
     """Add a new course."""
     from bson import ObjectId
     data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    admin_id = _verified_course_webapp_user(data.get("init_data", ""))
+    if not is_owner(admin_id):
+        raise HTTPException(status_code=403, detail="Owner access required")
     
     course_name = data.get("name", "").strip()
     if not course_name:
@@ -2212,10 +2211,9 @@ async def add_batch(request: Request):
     from bson import ObjectId
     import base64 as b64
     data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    admin_id = _verified_course_webapp_user(data.get("init_data", ""))
+    if not is_owner(admin_id):
+        raise HTTPException(status_code=403, detail="Owner access required")
     
     course_id = data.get("course_id")
     batch_name = data.get("batch_name", "").strip()
@@ -2243,10 +2241,9 @@ async def delete_course(request: Request):
     """Delete a course."""
     from bson import ObjectId
     data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    admin_id = _verified_course_webapp_user(data.get("init_data", ""))
+    if not is_owner(admin_id):
+        raise HTTPException(status_code=403, detail="Owner access required")
     
     course_id = data.get("course_id")
     courses_collection.delete_one({"_id": ObjectId(course_id)})
@@ -2257,10 +2254,9 @@ async def delete_batch(request: Request):
     """Delete a batch from a course."""
     from bson import ObjectId
     data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    admin_id = _verified_course_webapp_user(data.get("init_data", ""))
+    if not is_owner(admin_id):
+        raise HTTPException(status_code=403, detail="Owner access required")
     
     course_id = data.get("course_id")
     batch_id = data.get("batch_id")
@@ -2275,10 +2271,9 @@ async def edit_course(request: Request):
     """Edit a course name."""
     from bson import ObjectId
     data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    admin_id = _verified_course_webapp_user(data.get("init_data", ""))
+    if not is_owner(admin_id):
+        raise HTTPException(status_code=403, detail="Owner access required")
 
     course_id = data.get("course_id")
     name = data.get("name", "").strip()
@@ -2296,10 +2291,9 @@ async def edit_batch(request: Request):
     """Edit a batch name and link inside a course."""
     from bson import ObjectId
     data = await request.json()
-    admin_id = int(data.get("admin_id", 0))
-    owner_id = int(os.environ.get("ADMIN_ID", 0))
-    if admin_id != owner_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    admin_id = _verified_course_webapp_user(data.get("init_data", ""))
+    if not is_owner(admin_id):
+        raise HTTPException(status_code=403, detail="Owner access required")
 
     course_id = data.get("course_id")
     batch_id  = data.get("batch_id")
