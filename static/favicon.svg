@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Team Secret shield favicon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#101c2d"/>
+      <stop offset="1" stop-color="#071018"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#00f5d4"/>
+      <stop offset="1" stop-color="#5a8aff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <path d="M32 8 51 16v15c0 12-8.1 20.4-19 25C21.1 51.4 13 43 13 31V16Z" fill="#102b38" stroke="url(#edge)" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="m21 32 7.5 8L44 23" fill="none" stroke="url(#edge)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
