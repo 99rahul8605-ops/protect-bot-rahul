@@ -344,7 +344,7 @@ class PGCollection:
 
     # -- public pymongo-like API --------------------------------------------
 
-    def public_course_catalog(self) -> List[dict]:
+    def public_course_catalog(self, include_links: bool = False) -> List[dict]:
         """Get a small public course catalog directly from PostgreSQL.
 
         Crucially, never send full course documents (legacy base64 pictures and
@@ -352,6 +352,9 @@ class PGCollection:
         This is intentionally specific to the courses collection.
         """
         import json
+        # Only the authenticated admin API sets this flag. The public
+        # endpoint never receives the saved Telegram invite URL.
+        link_fragment = ", 'link', COALESCE(item.value->>'link', '')" if include_links else ""
         query = f"""
             SELECT t.id,
                    COALESCE(t.data->>'name', ''),
@@ -366,6 +369,7 @@ class PGCollection:
                                    THEN '/course-image/' || t.id || '/' || COALESCE(item.value->>'id', '')
                                    ELSE COALESCE(item.value->>'pic', '')
                                END
+                               {link_fragment}
                            ) ORDER BY item.ordinality
                        )
                        FROM jsonb_array_elements(
