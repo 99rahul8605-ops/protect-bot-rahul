@@ -4,6 +4,11 @@ import uuid
 import base64
 import asyncio
 import datetime
+import hashlib
+import hmac
+import json
+import time
+from urllib.parse import parse_qsl
 import io
 import requests
 from typing import Optional, List, Dict, Any
@@ -2049,14 +2054,95 @@ async def get_group_link(token: str):
     else:
         raise HTTPException(status_code=404, detail="Link not found")
 
+def _verified_course_webapp_user(init_data: str) -> int:
+    """Verify signed Telegram Mini App initData; never trust a client-sent user ID."""
+    if not init_data or len(init_data) > 8192:
+        raise HTTPException(status_code=401, detail="Open the courses page inside the Telegram bot")
+    try:
+        fields = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
+        received_hash = fields.pop("hash", "")
+        signed_at = int(fields.get("auth_date", "0"))
+        if not received_hash or abs(time.time() - signed_at) > 86400:
+            raise ValueError("Expired or missing Telegram signature")
+        token = os.environ.get("TELEGRAM_TOKEN", "")
+        if not token:
+            raise ValueError("Telegram bot token unavailable")
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(fields.items()))
+        secret_key = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
+        expected_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected_hash, received_hash):
+            raise ValueError("Invalid Telegram signature")
+        user_id = int(json.loads(fields["user"])["id"])
+        if user_id <= 0:
+            raise ValueError("Invalid user")
+        return user_id
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=401, detail="Telegram authentication failed; reopen the bot") from exc
+
+
+def _course_public_view(course: dict) -> dict:
+    """Never include stored Telegram invite links in public course data."""
+    return {
+        "id": str(course["_id"]),
+        "name": course.get("name", ""),
+        "order": course.get("order", 0),
+        "batches": [
+            {"id": b.get("id"), "name": b.get("name", ""), "pic": b.get("pic", "")}
+            for b in course.get("batches", [])
+        ],
+    }
+
+
 @app.get("/api/courses")
 async def api_courses():
-    """JSON API for courses data."""
-    courses = list(courses_collection.find({}, {"_id": 1, "name": 1, "batches": 1, "order": 1}).sort("order", 1))
-    for course in courses:
-        course["id"] = str(course["_id"])
-        del course["_id"]
-    return courses
+    """Public catalog: titles, images and IDs only; no private join links."""
+    courses = list(courses_collection.find(
+        {}, {"_id": 1, "name": 1, "batches": 1, "order": 1}
+    ).sort("order", 1))
+    return [_course_public_view(course) for course in courses]
+
+
+@app.post("/api/courses/admin-list")
+async def api_admin_courses(request: Request):
+    """Only the verified bot owner can fetch existing links for editing."""
+    data = await request.json()
+    user_id = _verified_course_webapp_user(data.get("init_data", ""))
+    if not is_owner(user_id):
+        raise HTTPException(status_code=403, detail="Owner access required")
+    courses = list(courses_collection.find(
+        {}, {"_id": 1, "name": 1, "batches": 1, "order": 1}
+    ).sort("order", 1))
+    return [
+        {
+            **_course_public_view(course),
+            "batches": [
+                {**b} for b in course.get("batches", [])
+            ]
+        }
+        for course in courses
+    ]
+
+
+@app.post("/api/courses/resolve")
+async def api_resolve_course_batch(request: Request):
+    """Return a join link only after Telegram authenticates the requesting user."""
+    data = await request.json()
+    _verified_course_webapp_user(data.get("init_data", ""))
+    course_id = str(data.get("course_id", ""))
+    batch_id = str(data.get("batch_id", ""))
+    if not ObjectId.is_valid(course_id) or not batch_id:
+        raise HTTPException(status_code=400, detail="Invalid course or batch")
+    course = courses_collection.find_one({"_id": ObjectId(course_id)})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    batch = next((b for b in course.get("batches", []) if str(b.get("id")) == batch_id), None)
+    if not batch or not batch.get("link"):
+        raise HTTPException(status_code=404, detail="Batch link unavailable")
+    link = batch["link"]
+    if not isinstance(link, str) or not link.startswith(("https://t.me/", "https://telegram.me/")):
+        raise HTTPException(status_code=400, detail="Invalid saved batch link")
+    return {"link": link}
+
 
 @app.get("/courses")
 async def courses_page(request: Request, admin_id: Optional[int] = None):
