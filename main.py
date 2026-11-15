@@ -1795,6 +1795,12 @@ async def telegram_webhook(request: Request, token: str):
     
     return Response(status_code=200)
 
+@app.head("/health")
+async def health_head():
+    """Allow uptime monitors using HTTP HEAD without querying PostgreSQL."""
+    return Response(status_code=200)
+
+
 @app.get("/health")
 async def health_check():
     """Lightweight HTTP liveness endpoint for Render and UptimeRobot.
@@ -1815,6 +1821,12 @@ async def readiness_check():
     except Exception as exc:
         logger.warning("Database readiness check failed: %s", exc)
         return Response(content="Database unavailable", status_code=503, media_type="text/plain")
+
+@app.head("/")
+async def root_head():
+    """Support HEAD checks against the service root URL."""
+    return Response(status_code=200)
+
 
 @app.get("/")
 async def root(request: Request):
