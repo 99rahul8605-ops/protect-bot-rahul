@@ -10,6 +10,7 @@ import json
 import time
 from urllib.parse import parse_qsl
 import io
+from PIL import Image, ImageOps, UnidentifiedImageError
 import requests
 from typing import Optional, List, Dict, Any
 from pg_shim import PGClient as MongoClient
@@ -50,27 +51,67 @@ courses_collection = db["courses"]
 media_collection = db["media"]  # batch/course images yahan alag store hoti hain
 
 
+# Safe cap protects PostgreSQL and the image decoder from unexpectedly huge uploads.
+Image.MAX_IMAGE_PIXELS = 24_000_000
+_MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024
+
+
+def _optimized_image(image_bytes: bytes) -> tuple[bytes, str]:
+    """Convert static user-uploaded images to bounded, browser-friendly WebP.
+
+    On malformed files, unsupported formats or animation, preserve the original.
+    Old files stay readable even if Pillow cannot process them.
+    """
+    if len(image_bytes) > _MAX_IMAGE_UPLOAD_BYTES:
+        return image_bytes, ""
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as opened:
+            if getattr(opened, "is_animated", False):
+                return image_bytes, ""
+            if opened.width * opened.height > 24_000_000:
+                return image_bytes, ""
+            picture = ImageOps.exif_transpose(opened)
+            picture.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
+            if picture.mode not in ("RGB", "RGBA"):
+                picture = picture.convert("RGBA" if "A" in picture.getbands() else "RGB")
+            output = io.BytesIO()
+            picture.save(output, format="WEBP", quality=78, method=5)
+            optimized = output.getvalue()
+            if len(optimized) < len(image_bytes):
+                return optimized, "image/webp"
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
+        logger.warning("Image optimization skipped: %s", exc)
+    return image_bytes, ""
+
+
 def save_image_and_get_url(data_uri: str) -> str:
-    """
-    Base64 data-URI (e.g. 'data:image/png;base64,....') ko alag 'media'
-    collection me save karta hai aur ek chhota-sa /media/<id> URL return
-    karta hai. Isse course/batch document ke andar bada base64 blob
-    embed nahi hota — fetch/save dono fast rehte hain.
-    Khaali ya invalid input pe khaali string return karta hai (no image).
-    """
+    """Store compressed images separately; batch records keep only /media/ URLs."""
     if not data_uri or not data_uri.startswith("data:"):
         return data_uri or ""
     try:
-        header, b64data = data_uri.split(",", 1)
+        header, encoded = data_uri.split(",", 1)
         mime = header.split(":", 1)[1].split(";", 1)[0] if ":" in header else "image/jpeg"
-    except Exception:
+        if not mime.startswith("image/"):
+            return ""
+        # Reject extremely large inline payloads before decoding.
+        if len(encoded) > (_MAX_IMAGE_UPLOAD_BYTES * 4 // 3 + 16):
+            return ""
+        original = base64.b64decode(encoded, validate=True)
+        optimized, new_mime = _optimized_image(original)
+        if new_mime:
+            mime = new_mime
+        image_id = str(ObjectId())
+        media_collection.insert_one({
+            "_id": image_id,
+            "mime": mime,
+            "data": base64.b64encode(optimized).decode("ascii"),
+            "optimized": True
+        })
+        return f"/media/{image_id}"
+    except (ValueError, TypeError, base64.binascii.Error) as exc:
+        logger.warning("Image upload skipped: %s", exc)
         return ""
 
-    image_id = str(ObjectId())
-    media_collection.insert_one({"_id": image_id, "mime": mime, "data": b64data})
-    # Relative path store karte hain (poora domain nahi) — isse agar Render
-    # ka domain/service kabhi change ho, purani images ke links nahi tootenge.
-    return f"/media/{image_id}"
 
 def init_db():
     """Verifies the PostgreSQL connection."""
@@ -1925,19 +1966,42 @@ async def check_membership_api(token: str, user_id: int):
 
 @app.get("/media/{image_id}")
 async def get_media_image(image_id: str):
-    """Batch/course images ko base64 store se serve karta hai (Cache-Control ke saath)."""
-    import base64 as b64
+    """Serve cached media and lazily optimize existing legacy images."""
     doc = media_collection.find_one({"_id": image_id})
     if not doc or not doc.get("data"):
         raise HTTPException(status_code=404, detail="Image not found")
     try:
-        image_bytes = b64.b64decode(doc["data"])
-    except Exception:
-        raise HTTPException(status_code=500, detail="Corrupt image data")
+        image_bytes = base64.b64decode(doc["data"], validate=True)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise HTTPException(status_code=500, detail="Corrupt image data") from exc
+
+    mime = doc.get("mime", "image/jpeg")
+    if not doc.get("optimized"):
+        optimized, new_mime = _optimized_image(image_bytes)
+        if new_mime:
+            image_bytes = optimized
+            mime = new_mime
+        # Existing document ID / URL remains unchanged. On a transient DB
+        # failure still serve the image, then retry optimizing next request.
+        try:
+            media_collection.update_one(
+                {"_id": image_id},
+                {"$set": {
+                    "data": base64.b64encode(image_bytes).decode("ascii"),
+                    "mime": mime,
+                    "optimized": True
+                }}
+            )
+        except Exception as exc:
+            logger.warning("Could not persist optimized image %s: %s", image_id, exc)
+
     return StreamingResponse(
         io.BytesIO(image_bytes),
-        media_type=doc.get("mime", "image/jpeg"),
-        headers={"Cache-Control": "public, max-age=604800"}
+        media_type=mime,
+        headers={
+            "Cache-Control": "public, max-age=604800",
+            "X-Content-Type-Options": "nosniff",
+        }
     )
 
 
