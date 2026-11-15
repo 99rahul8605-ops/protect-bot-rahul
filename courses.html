@@ -561,23 +561,28 @@ function goAdmin(){
 
 // ── Load Courses ──────────────────────────────────────────────
 async function loadCourses(){
-  // Cache-first: instantly render from localStorage if available
-  const CACHE_KEY = 'ts_courses_cache';
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if(cached){
-      allCourses = JSON.parse(cached);
-      renderCoursesList();
-      if(IS_ADMIN) renderAdminCourses();
-    }
-  } catch(e){}
-
+  // Always fetch the public link-free catalog; never cache private links.
+  clearCoursesCache();
   // Then fetch fresh data in background
   try {
     const res = await fetch(BASE_URL + '/api/courses');
     const fresh = await res.json();
-    localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
     allCourses = fresh;
+    if(IS_ADMIN && tg?.initData){
+      const adminRes = await fetch(BASE_URL + '/api/courses/admin-list', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({init_data: tg.initData})
+      });
+      if(adminRes.ok){
+        allCourses = await adminRes.json();
+      } else {
+        // Never render privileged controls if Telegram owner verification failed.
+        IS_ADMIN = false;
+        ADMIN_ID_VAL = 0;
+        document.getElementById('admin-btn').style.display = 'none';
+      }
+    }
     renderCoursesList();
     if(IS_ADMIN) renderAdminCourses();
   } catch(e){
@@ -772,21 +777,38 @@ function openBatchLink(link){
   }
 }
 
-function joinBatch(){
+async function joinBatch(){
   if(!activeBatch) return;
   const btn = document.getElementById('join-btn');
   btn.classList.add('sent');
   btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M20 6L9 17l-5-5"/></svg> Opening…`;
 
-  const link = activeBatch.link;
+  if(!tg?.initData){
+    btn.classList.remove('sent');
+    btn.textContent = 'Join Batch';
+    showInfoMsg('Please open this page from the Telegram bot to access the batch.');
+    return;
+  }
 
-  // Show info message
-  showInfoMsg('✅ Lecture sent to the bot! Please check your Telegram bot.');
-
-  // Seedha link open karo - ad sirf Generate Link pe hoga
-  openBatchLink(link);
-  setTimeout(()=>{ closePopup(); }, 800);
+  const courseId = activeCourse?.id;
+  const batchId = activeBatch?.id;
+  try {
+    const res = await fetch(BASE_URL + '/api/courses/resolve', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({init_data: tg.initData, course_id: courseId, batch_id: batchId})
+    });
+    if(!res.ok) throw new Error('Unable to open batch (' + res.status + ')');
+    const result = await res.json();
+    if(!result.link) throw new Error('Batch link unavailable');
+    openBatchLink(result.link);
+    setTimeout(()=>{ closePopup(); }, 800);
+  } catch(err){
+    btn.classList.remove('sent');
+    btn.textContent = 'Join Batch';
+    showInfoMsg(err.message || 'Failed to open batch. Please try again.');
+  }
 }
 
 // ── Info Message ──────────────────────────────────────────────
@@ -906,7 +928,7 @@ async function addCourse(){
   try {
     const res = await fetch(BASE_URL+'/admin/courses/add',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({admin_id:ADMIN_ID_VAL,name})
+      body:JSON.stringify({init_data: tg?.initData || '', admin_id:ADMIN_ID_VAL,name})
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
     document.getElementById('newCourseName').value='';
@@ -923,7 +945,7 @@ async function deleteCourse(courseId, name){
   try {
     const res = await fetch(BASE_URL+'/admin/courses/delete_course',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId})
+      body:JSON.stringify({init_data: tg?.initData || '', admin_id:ADMIN_ID_VAL,course_id:courseId})
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
     clearCoursesCache();
@@ -962,7 +984,7 @@ async function addBatch(courseId){
   try {
     const res = await fetch(BASE_URL+'/admin/courses/add_batch',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId,batch_name:name,batch_link:link,batch_pic:pic})
+      body:JSON.stringify({init_data: tg?.initData || '', admin_id:ADMIN_ID_VAL,course_id:courseId,batch_name:name,batch_link:link,batch_pic:pic})
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
     document.getElementById('bn-'+courseId).value='';
@@ -983,7 +1005,7 @@ async function deleteBatch(courseId, batchId){
   try {
     const res = await fetch(BASE_URL+'/admin/courses/delete_batch',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({admin_id:ADMIN_ID_VAL,course_id:courseId,batch_id:batchId})
+      body:JSON.stringify({init_data: tg?.initData || '', admin_id:ADMIN_ID_VAL,course_id:courseId,batch_id:batchId})
     });
     if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
     document.getElementById('abr-'+batchId)?.remove();
@@ -1056,7 +1078,7 @@ async function saveEdit(){
     try {
       const res = await fetch(BASE_URL+'/admin/courses/edit_course',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({admin_id:ADMIN_ID_VAL, course_id:editState.courseId, name})
+        body: JSON.stringify({init_data: tg?.initData || '', admin_id:ADMIN_ID_VAL, course_id:editState.courseId, name})
       });
       if(!res.ok){ const d=await res.json(); return toast(d.detail||'Error','error'); }
       clearCoursesCache();
@@ -1083,7 +1105,7 @@ async function saveEdit(){
       });
     }
 
-    const body = {admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link};
+    const body = {init_data: tg?.initData || '', admin_id:ADMIN_ID_VAL, course_id:editState.courseId, batch_id:editState.batchId, batch_name:name, batch_link:link};
     if(picPayload !== undefined) body.batch_pic = picPayload;
 
     try {
