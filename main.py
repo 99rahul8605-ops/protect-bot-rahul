@@ -2159,11 +2159,78 @@ def _course_public_view(course: dict) -> dict:
 
 @app.get("/api/courses")
 async def api_courses():
-    """Public catalog: titles, images and IDs only; no private join links."""
-    courses = list(courses_collection.find(
-        {}, {"_id": 1, "name": 1, "batches": 1, "order": 1}
-    ).sort("order", 1))
-    return [_course_public_view(course) for course in courses]
+    """Small public catalog: do not load old embedded pictures or private URLs."""
+    return await asyncio.to_thread(courses_collection.public_course_catalog)
+
+
+@app.get("/course-image/{course_id}/{batch_id}", include_in_schema=False)
+async def serve_legacy_course_image(course_id: str, batch_id: str):
+    """Upgrade an old inline picture to /media/ on first image request.
+
+    Only this specific picture is loaded, rather than bloating every
+    /api/courses response. Existing course/batch IDs remain unchanged.
+    """
+    if not ObjectId.is_valid(course_id) or not ObjectId.is_valid(batch_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    def _load_or_upgrade():
+        course = courses_collection.find_one({"_id": ObjectId(course_id)})
+        if not course:
+            return None
+        batch = next(
+            (b for b in course.get("batches", []) if str(b.get("id")) == batch_id),
+            None
+        )
+        if not batch:
+            return None
+        picture = batch.get("pic", "")
+        if isinstance(picture, str) and picture.startswith("/media/"):
+            return ("redirect", picture)
+        if not isinstance(picture, str) or not picture.startswith("data:image/"):
+            return None
+
+        try:
+            head, encoded = picture.split(",", 1)
+            mime = head[5:].split(";", 1)[0]
+            raw = base64.b64decode(encoded, validate=True)
+        except (ValueError, base64.binascii.Error):
+            return None
+
+        optimized, new_mime = _optimized_image(raw)
+        if new_mime:
+            raw, mime = optimized, new_mime
+
+        # Existing image is retained if the new media write fails.
+        try:
+            if len(raw) <= _MAX_IMAGE_UPLOAD_BYTES:
+                image_id = str(ObjectId())
+                media_collection.insert_one({
+                    "_id": image_id,
+                    "data": base64.b64encode(raw).decode("ascii"),
+                    "mime": mime,
+                    "optimized": True
+                })
+                courses_collection.update_one(
+                    {"_id": ObjectId(course_id), "batches.id": batch_id},
+                    {"$set": {"batches.$.pic": f"/media/{image_id}"}}
+                )
+        except Exception as exc:
+            logger.warning("Lazy course image migration failed for %s: %s", batch_id, exc)
+
+        return ("bytes", raw, mime)
+
+    result = await asyncio.to_thread(_load_or_upgrade)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    if result[0] == "redirect":
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=result[1], status_code=307)
+    return StreamingResponse(
+        io.BytesIO(result[1]),
+        media_type=result[2],
+        headers={"Cache-Control": "public, max-age=604800",
+                 "X-Content-Type-Options": "nosniff"}
+    )
 
 
 @app.post("/api/courses/admin-list")
