@@ -2240,18 +2240,7 @@ async def api_admin_courses(request: Request):
     user_id = _verified_course_webapp_user(data.get("init_data", ""))
     if not is_owner(user_id):
         raise HTTPException(status_code=403, detail="Owner access required")
-    courses = list(courses_collection.find(
-        {}, {"_id": 1, "name": 1, "batches": 1, "order": 1}
-    ).sort("order", 1))
-    return [
-        {
-            **_course_public_view(course),
-            "batches": [
-                {**b} for b in course.get("batches", [])
-            ]
-        }
-        for course in courses
-    ]
+    return await asyncio.to_thread(courses_collection.public_course_catalog, True)
 
 
 @app.post("/api/courses/resolve")
