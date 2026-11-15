@@ -7,3 +7,4 @@ dnspython
 requests==2.32.5
 flask
 psycopg2-binary
+Pillow>=10.4,<13
